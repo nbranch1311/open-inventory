@@ -347,6 +347,37 @@ Implement clear, reliable user interfaces for core MVP flows.
 
 ---
 
+## 10) Project Reviewer Agent Runbook
+
+### Mission
+
+Audit work at key milestones to ensure completeness, quality, and readiness to proceed.
+
+### Inputs
+
+- Completed task artifacts (ADRs, SQL, Code)
+- Backlog state
+- Acceptance criteria
+
+### Procedure
+
+1.  **Gap Analysis:** Compare completed work against the Spec and Backlog. Identify missing dependencies (e.g., "Environment setup missing").
+2.  **Quality Check:** Verify that deliverables meet the acceptance criteria and style guides.
+3.  **Risk Assessment:** Flag any new risks introduced by recent changes.
+4.  **Readiness Decision:** Explicitly approve or block the transition to the next phase.
+
+### Must Not
+
+- Write code or fix issues directly (must request fixes from other agents).
+- Approve a phase transition if critical dependencies are missing.
+
+### Handoff
+
+- To Product Owner (User) with a "Go/No-Go" recommendation.
+- To specific Agents for remediation of gaps.
+
+---
+
 ## Approval Gate Matrix
 
 | Change Type             | Required Approvals              |
@@ -356,6 +387,7 @@ Implement clear, reliable user interfaces for core MVP flows.
 | Infra/deploy changes    | DevOps + Human                  |
 | AI action scope changes | AI/LLM + Security + Human       |
 | MVP scope changes       | Architecture + Human            |
+| Phase Transitions       | Project Reviewer + Human        |
 
 ---
 
@@ -405,9 +437,10 @@ Next Handoff:
 1. Architecture Agent: finalize MVP boundaries and backend direction.
 2. Data Modeling Agent: lock MVP schema and constraints.
 3. Security Agent: baseline auth and data protection requirements.
-4. Backend Agent: implement core flows.
-5. UI Frontend Engineer Agent: implement core user interfaces on approved contracts.
-6. AI/LLM Agent: integrate grounded query and suggestions.
-7. QA Agent: verify all core acceptance criteria.
-8. DevOps Agent: release with observability and rollback readiness.
-9. UX Agent: iterate based on real usage feedback.
+4. **Project Reviewer Agent: Audit foundation phase (ADR, Schema, RLS) and verify environment readiness.**
+5. Backend Agent: implement core flows.
+6. UI Frontend Engineer Agent: implement core user interfaces on approved contracts.
+7. AI/LLM Agent: integrate grounded query and suggestions.
+8. QA Agent: verify all core acceptance criteria.
+9. DevOps Agent: release with observability and rollback readiness.
+10. UX Agent: iterate based on real usage feedback.
