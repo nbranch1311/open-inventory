@@ -233,6 +233,10 @@ Each `InventoryItem` must support:
 - Clear empty states and "next best action" prompts.
 - No hidden AI actions; always transparent when AI is used.
 - Explainable AI responses with linked source items.
+- Use `shadcn/ui` components and patterns as the default UI foundation.
+- Use a `shadcn` auth template/pattern for login/signup as the baseline implementation direction.
+- Product owner design approval is required before major UI flow implementation or redesign.
+- After auth is working, prioritize mobile-ready responsive behavior for all core MVP screens.
 
 ---
 

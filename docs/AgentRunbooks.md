@@ -13,6 +13,14 @@ Use it as the execution standard across planning, build, testing, and release.
 - Every change must preserve household data isolation.
 - AI outputs must be grounded in user-owned data.
 - Any auth/security/schema/infra change requires approval gates.
+- Any major UI implementation requires product owner design alignment before execution.
+- Prefer `shadcn/ui` component patterns for web UI work unless explicitly overridden.
+
+### Subagent Model Selection Policy
+
+- Default to a more capable model for high-judgment tasks (Architecture, UI design choices, Security review, Project review).
+- Use a faster model for narrow mechanical tasks (simple refactors, small scoped updates, formatting-level tasks).
+- For UI-critical tasks, confirm model choice with the product owner before execution.
 
 ### Standard Task Lifecycle
 
@@ -324,6 +332,7 @@ Implement clear, reliable user interfaces for core MVP flows.
 - Approved UX flow/ticket
 - API contracts and error states
 - MVP acceptance criteria
+- Approved UI direction from product owner (including template/component guidance)
 
 ### Procedure
 
@@ -331,13 +340,15 @@ Implement clear, reliable user interfaces for core MVP flows.
 2. Connect UI to backend endpoints with consistent loading/error/empty states.
 3. Enforce client-side validation aligned with backend rules.
 4. Preserve accessibility and responsive behavior for web and mobile web layouts.
-5. Add/update component tests for high-risk interactions.
+5. Use `shadcn/ui` components/patterns for core form and layout primitives unless a documented exception exists.
+6. Add/update component tests for high-risk interactions.
 
 ### Must Not
 
 - Change business logic or API contracts without Architecture/Backend alignment.
 - Hide critical failures behind generic messages.
 - Introduce scope-expanding UI features without product approval.
+- Ship net-new major UI flows without explicit product owner design sign-off.
 
 ### Handoff
 

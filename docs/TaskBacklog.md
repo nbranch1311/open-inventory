@@ -55,7 +55,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-002`
 - **Owner Agent:** Data Modeling Agent
 - **Priority:** `P0`
-- **Status:** `done`
+- **Status:** `todo`
 - **Effort:** `L`
 - **Dependencies:** `T-001`
 - **Objective:** create stable schema for MVP entities and relationships.
@@ -75,7 +75,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-003`
 - **Owner Agent:** Security/Privacy Agent
 - **Priority:** `P0`
-- **Status:** `done`
+- **Status:** `todo`
 - **Effort:** `M`
 - **Dependencies:** `T-001`, `T-002`
 - **Objective:** define mandatory auth, access control, and data protection requirements for implementation.
@@ -116,9 +116,9 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `L`
-- **Dependencies:** `T-003.5-Setup`
+- **Dependencies:** `T-002`, `T-003`
 - **Objective:** deliver account signup/login and single-household setup flow.
 - **Deliverables:**
   - Auth endpoints/services.
@@ -136,7 +136,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-004-API`
 - **Objective:** build responsive login, signup, and household creation screens.
@@ -156,7 +156,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-005-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `L`
 - **Dependencies:** `T-004-API`
 - **Objective:** deliver create/read/update/delete flows for inventory items.
@@ -176,7 +176,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-005-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `L`
 - **Dependencies:** `T-005-API`
 - **Objective:** build main inventory dashboard and item add/edit forms.
@@ -188,6 +188,63 @@ Use this as the single queue for MVP delivery.
   - User can create item and see it appear in list immediately.
   - Empty states guide user to add first item.
   - Edit form pre-fills correctly.
+
+---
+
+## 5.5) UI/Design Alignment Gate (Owner Review Required)
+
+- **Task ID:** `T-005.5-Review`
+- **Owner Agent:** Project Reviewer Agent + UX/Product Research Agent
+- **Priority:** `P0`
+- **Status:** `in_progress`
+- **Effort:** `S`
+- **Dependencies:** `T-004-API`
+- **Objective:** align implemented and planned UI with product owner expectations before further UI expansion.
+- **Deliverables:**
+  - UI review notes covering auth, onboarding, dashboard, and item forms.
+  - Gap list between current implementation and desired design direction.
+  - Go/No-Go decision for continued UI feature delivery.
+- **Acceptance Criteria:**
+  - Product owner signs off on direction or requests explicit rework.
+  - Next UI tasks have clear scope and approved design references.
+
+---
+
+## 5.6) Adopt shadcn Auth Template Baseline
+
+- **Task ID:** `T-005.6-UI`
+- **Owner Agent:** UI Frontend Engineer Agent
+- **Priority:** `P0`
+- **Status:** `blocked`
+- **Effort:** `M`
+- **Dependencies:** `T-005.5-Review`, Owner sign-off on `docs/UiBaselineAuth001.md`
+- **Objective:** align login/signup UX with approved `shadcn` auth template patterns.
+- **Deliverables:**
+  - Updated login/signup screens using approved shadcn-based structure.
+  - Updated validation and error presentation patterns.
+  - Notes documenting any intentional deviations.
+- **Acceptance Criteria:**
+  - Product owner approves visual and interaction baseline for auth.
+  - Auth flow remains functionally equivalent after UI alignment.
+
+---
+
+## 5.7) Mobile-Ready Foundation (Post-Auth)
+
+- **Task ID:** `T-005.7-UI`
+- **Owner Agent:** UI Frontend Engineer Agent
+- **Priority:** `P0`
+- **Status:** `todo`
+- **Effort:** `M`
+- **Dependencies:** `T-005.6-UI`
+- **Objective:** make post-auth core screens mobile-ready before new UI feature expansion.
+- **Deliverables:**
+  - Responsive layout behavior for dashboard, add/edit item, and auth-adjacent flows.
+  - Mobile-friendly spacing, tap targets, and typography adjustments.
+  - Breakpoint checklist for key viewports.
+- **Acceptance Criteria:**
+  - Core authenticated screens are usable on common mobile viewport sizes.
+  - Product owner validates mobile readiness baseline.
 
 ---
 
@@ -218,7 +275,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-006-API`
+- **Dependencies:** `T-006-API`, `T-005.7-UI`
 - **Objective:** allow users to drag-and-drop or select files for items.
 - **Deliverables:**
   - File picker/dropzone component.
@@ -258,7 +315,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-007-API`
+- **Dependencies:** `T-007-API`, `T-005.7-UI`
 - **Objective:** build search bar and filter controls.
 - **Deliverables:**
   - Global search input (debounced).
@@ -298,7 +355,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-008-API`
+- **Dependencies:** `T-008-API`, `T-005.7-UI`
 - **Objective:** display upcoming reminders and allow management.
 - **Deliverables:**
   - Reminder widget on dashboard.
@@ -337,7 +394,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-009-AI`
+- **Dependencies:** `T-009-AI`, `T-005.7-UI`
 - **Objective:** chat-like interface for "Ask my inventory".
 - **Deliverables:**
   - Chat input component.
@@ -374,12 +431,13 @@ Use this as the single queue for MVP delivery.
 
 1. `T-001` -> `T-002` -> `T-003`
 2. `T-004-API` -> `T-004-UI` -> `T-005-API` -> `T-005-UI`
-3. Parallel streams:
+3. `T-005.5-Review` -> `T-005.6-UI` -> `T-005.7-UI`
+4. Parallel streams:
    - `T-006-API` -> `T-006-UI`
    - `T-007-API` -> `T-007-UI`
    - `T-008-API` -> `T-008-UI`
-4. `T-009-AI` -> `T-009-UI`
-5. `T-010` closes MVP readiness
+5. `T-009-AI` -> `T-009-UI`
+6. `T-010` closes MVP readiness
 
 ---
 
