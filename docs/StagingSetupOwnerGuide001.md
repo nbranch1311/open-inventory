@@ -7,8 +7,10 @@ Provide a step-by-step owner runbook to manage staging validation without losing
 ## Current Status (2026-02-14)
 
 - `T-004.9-EnvSplit`: completed.
-- Current gate blocker is staging signup ON-path validation under strict limits.
-- This is an environment throughput issue, not a known app-code regression.
+- `T-004.8-API`: completed and closed in `docs/Project-Review-010.md`.
+- Staging parity gap (missing onboarding RPC) was fixed and validated in-window.
+- Staging policy has been restored after the controlled QA window.
+- Remaining auth-mode hardening is tracked as follow-up task `T-004.10-QA`.
 
 ### Owner Progress Snapshot (This Session)
 
@@ -19,8 +21,9 @@ Provide a step-by-step owner runbook to manage staging validation without losing
   - `Rate limit for sign-ups and sign-ins`:
     - dev: `60 requests/5 min`
     - staging: `30 requests/5 min`
-- Staging auth mode has been temporarily changed to confirmation OFF for execution.
-- Remaining owner work: **Step 4 (define QA window)** and **Step 4.5 (confirm QA credentials)**.
+- Controlled QA window execution completed.
+- Staging auth policy restored after test execution.
+- Remaining owner work from this guide: none.
 
 ## Decision Path (Choose One)
 
@@ -62,7 +65,7 @@ Owner output to agent (copy/paste):
 - `staging_limits_before_recorded=yes`
 - `staging_temp_override_applied=yes`
 - `dev_confirm_email=off`
-- `staging_confirm_email=off`
+- `staging_confirm_email=on`
 
 ### Phase A2 - Agent Execution (QA + Reviewer)
 

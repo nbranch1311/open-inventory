@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Menu, User } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -22,8 +22,44 @@ function getAvatarFallback(email: string) {
 export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [desktopAccountOpen, setDesktopAccountOpen] = useState(false)
+  const desktopMenuContainerRef = useRef<HTMLDivElement | null>(null)
 
   const avatarFallback = useMemo(() => getAvatarFallback(email), [email])
+
+  useEffect(() => {
+    if (!desktopAccountOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const targetNode = event.target as Node | null
+      if (!targetNode) {
+        return
+      }
+
+      if (desktopMenuContainerRef.current?.contains(targetNode)) {
+        return
+      }
+
+      setDesktopAccountOpen(false)
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDesktopAccountOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [desktopAccountOpen])
 
   return (
     <header className="border-b border-(--border) bg-background">
@@ -42,7 +78,7 @@ export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
         </nav>
 
         <div className="hidden sm:block">
-          <div className="relative">
+          <div className="relative" ref={desktopMenuContainerRef}>
             <Button
               type="button"
               variant="outline"

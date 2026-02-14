@@ -20,6 +20,17 @@ describe('AccountMenu', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
+  it('closes desktop account menu when clicking outside', () => {
+    render(<AccountMenu email="owner@example.com" signOutAction={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open account menu' }))
+    expect(screen.getByText('Signed in as')).toBeInTheDocument()
+
+    fireEvent.mouseDown(document.body)
+
+    expect(screen.queryByText('Signed in as')).not.toBeInTheDocument()
+  })
+
   it('opens mobile navigation path and exposes account section', () => {
     render(<AccountMenu email="owner@example.com" signOutAction={vi.fn()} />)
 

@@ -45,10 +45,23 @@ export async function getInventoryItem(itemId: string) {
 export async function createInventoryItem(householdId: string, item: InsertItem) {
   const supabase = await createClient()
 
-  // Validate householdId matches item.household_id if provided in item, or just use householdId
-  // The type InsertItem includes household_id, so we should ensure consistency
+  // Validate householdId matches item.household_id if provided in item
   if (item.household_id && item.household_id !== householdId) {
     return { error: 'Household ID mismatch' }
+  }
+
+  // Validate required fields
+  const name = (item.name ?? '').toString().trim()
+  if (!name) {
+    return { error: 'Name is required' }
+  }
+  const quantity = Number(item.quantity)
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return { error: 'Quantity must be a positive number' }
+  }
+  const unit = (item.unit ?? '').toString().trim()
+  if (!unit) {
+    return { error: 'Unit is required' }
   }
 
   const { data, error } = await supabase
@@ -62,17 +75,18 @@ export async function createInventoryItem(householdId: string, item: InsertItem)
     return { error: 'Failed to create inventory item' }
   }
 
-  revalidatePath(`/households/${householdId}`)
+  revalidatePath('/dashboard')
   return { data }
 }
 
-export async function updateInventoryItem(itemId: string, item: UpdateItem) {
+export async function updateInventoryItem(householdId: string, itemId: string, item: UpdateItem) {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('inventory_items')
     .update(item)
     .eq('id', itemId)
+    .eq('household_id', householdId)
     .select()
     .single()
 
@@ -82,40 +96,28 @@ export async function updateInventoryItem(itemId: string, item: UpdateItem) {
   }
 
   if (data) {
-    revalidatePath(`/households/${data.household_id}`)
+    revalidatePath('/dashboard')
+    revalidatePath(`/dashboard/${data.id}`)
   }
-  
+
   return { data }
 }
 
-export async function deleteInventoryItem(itemId: string) {
+export async function deleteInventoryItem(householdId: string, itemId: string) {
   const supabase = await createClient()
-
-  // First get the item to know which household to revalidate
-  const { data: item, error: fetchError } = await supabase
-    .from('inventory_items')
-    .select('household_id')
-    .eq('id', itemId)
-    .single()
-
-  if (fetchError) {
-     console.error('Error fetching item for deletion:', fetchError)
-     return { error: 'Failed to fetch item for deletion' }
-  }
 
   const { error } = await supabase
     .from('inventory_items')
     .delete()
     .eq('id', itemId)
+    .eq('household_id', householdId)
 
   if (error) {
     console.error('Error deleting inventory item:', error)
     return { error: 'Failed to delete inventory item' }
   }
 
-  if (item) {
-    revalidatePath(`/households/${item.household_id}`)
-  }
-
+  revalidatePath('/dashboard')
+  revalidatePath(`/dashboard/${itemId}`)
   return { success: true }
 }

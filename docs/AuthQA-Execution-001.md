@@ -18,7 +18,7 @@ Staging readiness checks completed before rerun:
 | P0 Scenario | Status | Evidence |
 | --- | --- | --- |
 | Signup confirmation OFF (dev) | passed | `env:dev-target` Playwright JSON run (`/tmp/t0048-dev-qa-auth-p0.json`) shows `stats.expected: 4`, `stats.skipped: 0`, `stats.unexpected: 0`. |
-| Signup confirmation ON (staging/prod) | follow_up | During this QA window staging confirmation was temporarily OFF to unblock deterministic rerun chain. Dedicated confirmation-ON staging validation remains tracked as follow-up. |
+| Signup confirmation ON (staging/prod) | passed | Owner confirmed staging confirmation mode restored ON; `env:staging-target` rerun evidence (`/tmp/regval-staging-qa-auth-p0.json`) is green with no skips. |
 | Login success | passed | Passed in `env:dev-target` and `env:staging-target` deterministic runs. |
 | Login invalid credentials | passed | Passed in both env legs on `qa-auth-p0.spec.ts`. |
 | Protected route unauth (`/dashboard`, `/onboarding`) | passed | Passed in both env legs on `qa-auth-p0.spec.ts`. |
@@ -63,6 +63,15 @@ Post-fix rerun (`/tmp/t0048-staging-qa-auth-p0-postfix.json`):
 Post-window owner action:
 - Staging policy was restored after the controlled QA window.
 
+4) Confirmation-ON hardening rerun (`T-004.10-QA`, `env:staging-target`)  
+Command:
+- `CI= NEXT_PUBLIC_SUPABASE_URL="https://lsqeeunbupisvkqpzypi.supabase.co" NEXT_PUBLIC_SUPABASE_ANON_KEY="<staging_publishable_key>" pnpm --filter @open-inventory/web exec playwright test qa-auth-p0.spec.ts --project=chromium --config=playwright.config.ts --workers=1 --reporter=json > /tmp/regval-staging-qa-auth-p0.json`
+
+Key output (`/tmp/regval-staging-qa-auth-p0.json`):
+- `stats.expected: 4`
+- `stats.skipped: 0`
+- `stats.unexpected: 0`
+
 3) Cross-environment setup verification  
 - Dev URL confirmed via MCP: `https://vsjihxrquvhajeljhuzh.supabase.co`
 - Staging URL confirmed via MCP: `https://lsqeeunbupisvkqpzypi.supabase.co`
@@ -72,8 +81,8 @@ Post-window owner action:
 
 No remaining `T-004.8-API` gate blocker after staging RPC migration fix and post-fix green rerun.
 
-Residual follow-up (not a `T-004.8-API` blocker):
-- Run dedicated staging confirmation-ON validation after policy restore to close production-like auth-mode coverage loop.
+Residual follow-up (non-blocking hardening):
+- Keep periodic confirmation-ON staged auth validation in regression cadence.
 
 ## Gate Decision
 
@@ -81,4 +90,22 @@ Residual follow-up (not a `T-004.8-API` blocker):
 
 ## Next Action
 
-Run a dedicated staging confirmation-ON auth-mode validation pass and record results in this document.
+Continue periodic staged confirmation-ON auth-mode validation and record results in this document.
+
+## T-005 Readiness Gate Context
+
+This document covers the **auth gate** only. T-005 readiness requires **both** gates green:
+- Auth gate: `qa-auth-p0.spec.ts` (this document's scope)
+- Inventory CRUD gate: `qa-inventory-crud.spec.ts`
+
+See `docs/TaskBacklog.md` section "T-005 Readiness Gates (Dual Gate Required)".
+
+## Dual-Gate Combined Evidence (Dev)
+
+Combined gate command:
+- `CI= NEXT_PUBLIC_SUPABASE_URL="https://vsjihxrquvhajeljhuzh.supabase.co" NEXT_PUBLIC_SUPABASE_ANON_KEY="<dev_publishable_key>" pnpm --filter @open-inventory/web exec playwright test qa-auth-p0.spec.ts qa-inventory-crud.spec.ts --project=chromium --config=playwright.config.ts --workers=1 --reporter=json > /tmp/t005-dual-gate-dev.json`
+
+Combined gate result (`/tmp/t005-dual-gate-dev.json`):
+- `stats.expected: 6`
+- `stats.skipped: 0`
+- `stats.unexpected: 0`

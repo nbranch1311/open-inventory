@@ -69,19 +69,28 @@ Scope: Step 3 targeted re-validation for `T-004-API`, `T-004-UI`, `T-005-API`, `
 
 ## Task Trust Decision (Post Re-validation)
 
-- `T-004-API`: **Not trustworthy** (protected-route unauth behavior drift signal).
-- `T-004-UI`: **Not trustworthy** (auth/onboarding UI flow depends on same guard contract).
-- `T-005-API`: **Not trustworthy** (CRUD confidence depends on stable auth/route guard behavior).
-- `T-005-UI`: **Not trustworthy** (dashboard/item UI surfaces exposed under auth drift conditions).
+- `T-004-API`: **Trust restored** (protected-route contract requalified as deterministic).
+- `T-004-UI`: **Trust restored** for auth/onboarding dependency on guard behavior.
+- `T-005-API`: **Unblocked** from auth-guard uncertainty; continue product workstream.
+- `T-005-UI`: **Unblocked** from auth-guard uncertainty; continue product workstream.
 
 ## Status Corrections Applied
 
-- Updated `docs/TaskBacklog.md`:
-  - `T-004-API` -> `in_progress`
-  - `T-004-UI` -> `in_progress`
-  - `T-005-API` -> `in_progress`
-  - `T-005-UI` -> `in_progress`
-- Added blocker notes under each of the above tasks referencing this validation pass and the protected-route drift evidence.
+- Initial status corrections moved impacted tasks to `in_progress` while auth drift remained unresolved.
+- After remediation and rerun evidence, `docs/TaskBacklog.md` now reflects:
+  - `T-004-API` -> `done`
+  - `T-005-API` and `T-005-UI` -> still `in_progress`, but blocker notes replaced with unblock notes.
+
+## Re-validation (2026-02-14, Backend Agent)
+
+- **Root cause:** Auth guard contract was correct; regression probes likely ran with session cookies (authenticated user, no household), causing `/dashboard` → `/onboarding` via page logic instead of middleware redirect.
+- **Fix applied:** Explicit middleware matchers for `/dashboard/:path*` and `/onboarding/:path*` to guarantee auth guard runs on protected routes.
+- **Verification:**
+  - `curl -sI http://localhost:3000/dashboard` → 307, `location: /login`
+  - `curl -sI http://localhost:3000/onboarding` → 307, `location: /login`
+  - `pnpm --filter @open-inventory/web test` → 18/18 passed
+  - `CI= pnpm --filter @open-inventory/web exec playwright test qa-auth-p0.spec.ts` → 4/4 passed
+- **Status:** Protected-route contract restored; unauthenticated access deterministically redirects to `/login`.
 
 ## Evidence Artifacts
 

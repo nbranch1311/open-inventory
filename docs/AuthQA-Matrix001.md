@@ -36,14 +36,18 @@ Define minimum QA coverage for auth/session/onboarding reliability before expand
 - Redirect contract behavior matches `docs/AuthFlow001.md`.
 - Known issues are documented with severity and owner.
 
-## P0 Execution Mapping (2026-02-14, `T-004.8-API` Post-Env-Split Rerun)
+## T-005 Readiness Gate Composition
+
+The auth gate (`qa-auth-p0.spec.ts`) is **one of two** required gates for T-005 readiness. The other is the inventory CRUD gate (`qa-inventory-crud.spec.ts`). Both must be green before T-005 is considered ready. See `docs/TaskBacklog.md` section "T-005 Readiness Gates (Dual Gate Required)".
+
+## P0 Execution Mapping (2026-02-14, Post Revalidation + Hardening)
 
 Reference evidence: `docs/AuthQA-Execution-001.md`
 
 | Area | Scenario | Status | Evidence |
 | --- | --- | --- | --- |
 | Signup | Email confirmation OFF (dev) | passed | `env:dev-target` JSON evidence (`/tmp/t0048-dev-qa-auth-p0.json`) shows signup probe passed with no skip annotations. |
-| Signup | Email confirmation ON (staging/prod) | follow_up | Current green rerun executed during controlled staging window where confirmation was temporarily OFF; dedicated confirmation-ON validation remains open. |
+| Signup | Email confirmation ON (staging/prod) | passed | Owner confirmed staging confirmation mode restored ON; staging rerun evidence (`/tmp/regval-staging-qa-auth-p0.json`) is green with no skips. |
 | Login | Valid credentials | passed | Covered in both `env:dev-target` and post-fix `env:staging-target` deterministic runs. |
 | Login | Invalid credentials | passed | Passed in both env legs on `qa-auth-p0.spec.ts`. |
 | Session | Sign out from account menu | passed | Covered in `env:dev-target` full deterministic flow by clearing session and asserting redirect behavior. |
@@ -63,7 +67,7 @@ Evidence sources:
 | Area | Scenario | Intended Env | Mapping Basis | Evidence Coverage (2026-02-14) |
 | --- | --- | --- | --- | --- |
 | Signup | Email confirmation OFF (dev) | dev | Scenario label + Env Split target model states dev confirmation OFF. | passed in `env:dev-target` JSON evidence. |
-| Signup | Email confirmation ON (staging/prod) | staging | Scenario label + Env Split target model states staging confirmation ON. | follow_up: dedicated confirmation-ON validation pending after policy restore. |
+| Signup | Email confirmation ON (staging/prod) | staging | Scenario label + Env Split target model states staging confirmation ON. | passed in staging hardening rerun (`/tmp/regval-staging-qa-auth-p0.json`). |
 | Login | Valid credentials | dev + staging | Required Environments include both dev and staging for auth QA contract checks. | passed in both env legs post-fix. |
 | Login | Invalid credentials | dev + staging | Required Environments include both dev and staging for auth QA contract checks. | passed in both env legs. |
 | Session | Sign out from account menu | dev + staging | Required Environments include both dev and staging for auth QA contract checks. | covered by deterministic flow behavior; additional explicit menu-path parity can remain follow-up. |

@@ -116,7 +116,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `in_progress`
+- **Status:** `done`
 - **Effort:** `L`
 - **Dependencies:** `T-002`, `T-003`
 - **Objective:** deliver account signup/login and single-household setup flow.
@@ -128,8 +128,12 @@ Use this as the single queue for MVP delivery.
   - New user can sign up, log in, create household.
   - Unauthenticated access is rejected correctly.
   - QA verifies setup flow end-to-end.
-- **Blocker Note (Regression-Validation-001):**
-  - Protected-route guard behavior is drifting in runtime validation (`/onboarding` reachable; `/dashboard` redirects to `/onboarding` instead of `/login` for fresh client checks). Re-qualification required before this task can return to `done`.
+- **Completion Notes (2026-02-14):**
+  - Regression-Validation-001 requalification is green after auth-guard hardening.
+  - Added explicit middleware protected-route matchers in `apps/web/middleware.ts` for `/dashboard/:path*` and `/onboarding/:path*`.
+  - Deterministic auth reruns passed in dev and staging:
+    - `/tmp/regval-dev-qa-auth-p0.json` -> `expected: 4`, `skipped: 0`, `unexpected: 0`
+    - `/tmp/regval-staging-qa-auth-p0.json` -> `expected: 4`, `skipped: 0`, `unexpected: 0`
 
 ---
 
@@ -150,8 +154,8 @@ Use this as the single queue for MVP delivery.
   - Forms validate input before submission.
   - Loading states shown during auth requests.
   - Successful login redirects to inventory dashboard.
-- **Blocker Note (Regression-Validation-001):**
-  - UI flow trust depends on auth guard correctness. Current regression pass found protected-route contract drift; auth/onboarding UI must be re-verified after guard behavior is corrected.
+- **Revalidation Note (2026-02-14):**
+  - Auth/onboarding UI dependency on protected-route contract has been requalified via green auth reruns and middleware hardening.
 
 ---
 
@@ -285,7 +289,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004.10-QA`
 - **Owner Agent:** QA Agent + Security/Privacy Agent
 - **Priority:** `P1`
-- **Status:** `pending`
+- **Status:** `done`
 - **Effort:** `S`
 - **Dependencies:** `T-004.8-API`
 - **Objective:** run dedicated auth validation in staging with confirmation ON and record production-like behavior evidence.
@@ -296,6 +300,28 @@ Use this as the single queue for MVP delivery.
 - **Acceptance Criteria:**
   - Confirmation-ON behavior is explicitly validated and documented in staging.
   - Any gaps are documented as residual risk with owner decision.
+- **Completion Notes (2026-02-14):**
+  - Owner confirmed staging policy restored to confirmation ON before this pass.
+  - Staging auth rerun evidence captured: `/tmp/regval-staging-qa-auth-p0.json` (`expected: 4`, `skipped: 0`, `unexpected: 0`).
+  - No residual blocker raised for confirmation-mode behavior in this gate cycle.
+
+---
+
+## T-005 Readiness Gates (Dual Gate Required)
+
+**T-005** (`T-005-API` + `T-005-UI`) is considered ready only when **BOTH** gates are green:
+
+| Gate | Spec | Purpose |
+| --- | --- | --- |
+| Auth gate | `apps/web/qa-auth-p0.spec.ts` | Auth/session/onboarding/route-guard P0 matrix |
+| Inventory CRUD gate | `apps/web/qa-inventory-crud.spec.ts` | Authenticated add/edit/delete lifecycle (desktop + mobile) |
+
+Verification: `pnpm --filter @open-inventory/web exec playwright test qa-auth-p0.spec.ts qa-inventory-crud.spec.ts --config playwright.config.ts`
+Latest evidence: `/tmp/t005-dual-gate-dev.json` (`expected: 6`, `skipped: 0`, `unexpected: 0`)
+
+Environment policy:
+- Blocking requirement for T-005 progression: dev dual-gate green.
+- Staging dual-gate remains periodic hardening evidence, not a blocking prerequisite at this phase.
 
 ---
 
@@ -316,8 +342,15 @@ Use this as the single queue for MVP delivery.
   - Items are household-scoped for all operations.
   - Validation errors are clear and stable.
   - CRUD flows pass integration tests.
-- **Blocker Note (Regression-Validation-001):**
-  - Auth-route drift prevents trustworthy confirmation of authenticated-only CRUD behavior across dashboard/item paths. Re-validation required after auth guard contract is stabilized.
+- **Gate Tests (both required):**
+  - Auth gate: `qa-auth-p0.spec.ts` green.
+  - CRUD gate: `qa-inventory-crud.spec.ts` green for authenticated add/edit/delete lifecycle coverage.
+- **Unblock Note (2026-02-14):**
+  - Regression-Validation-001 auth-guard drift has been requalified as green; this task is no longer blocked on route-guard uncertainty.
+- **Progress (2026-02-14):**
+  - Added explicit household-scoping to update/delete (defense-in-depth).
+  - Added required-field validation for create (name, quantity, unit).
+  - Added unit tests for CRUD flows (`apps/web/src/actions/inventory.test.ts`).
 
 ---
 
@@ -338,8 +371,11 @@ Use this as the single queue for MVP delivery.
   - User can create item and see it appear in list immediately.
   - Empty states guide user to add first item.
   - Edit form pre-fills correctly.
-- **Blocker Note (Regression-Validation-001):**
-  - Dashboard/item UI surfaces remain at risk while protected-route auth behavior is inconsistent. Re-qualification needed once upstream auth guard drift is resolved.
+- **Gate Tests (both required):**
+  - Auth gate: `qa-auth-p0.spec.ts` green.
+  - CRUD gate: `qa-inventory-crud.spec.ts` green for desktop + mobile UX states (success/error/empty-state assertions).
+- **Unblock Note (2026-02-14):**
+  - Protected-route auth behavior has been revalidated as deterministic; this task is no longer blocked by Regression-Validation-001.
 
 ---
 

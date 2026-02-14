@@ -20,7 +20,7 @@ Environment provisioning and readiness checklist is tracked in `docs/EnvSplitChe
 - Staging target project ref: `lsqeeunbupisvkqpzypi` (`inventory-staging`).
 - Current validation state:
   - Dev `confirmation OFF`: **manual dashboard verification required**.
-  - Staging `confirmation ON`: behavioral evidence exists in `docs/AuthQA-Execution-001.md`, but dashboard setting still requires manual confirmation evidence for deterministic gate closure.
+  - Staging `confirmation ON`: dedicated confirmation-ON behavioral evidence captured and tracked as complete in `docs/TaskBacklog.md` (`T-004.10-QA`).
 - Manual verification instruction (both environments):
   1. Open Supabase dashboard for the environment project.
   2. Navigate to `Authentication -> Providers -> Email`.

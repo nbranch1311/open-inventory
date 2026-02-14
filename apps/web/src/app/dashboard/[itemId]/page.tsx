@@ -28,7 +28,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ ite
       return { error: 'Name, quantity, and unit are required.' }
     }
 
-    const { error } = await updateInventoryItem(itemId, {
+    const { error } = await updateInventoryItem(item.household_id, itemId, {
       name,
       quantity,
       unit,
@@ -48,7 +48,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ ite
     void previousState
     void formData
 
-    const { error } = await deleteInventoryItem(itemId)
+    const { error } = await deleteInventoryItem(item.household_id, itemId)
     if (error) {
       return { error }
     }
