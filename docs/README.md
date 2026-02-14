@@ -4,6 +4,7 @@ Use this document to define product direction before implementation.
 Fill in each section, then share it back for architecture and execution planning.
 
 Primary implementation spec lives in `MvpAppSpec.md`.
+Current status and doc map lives in `STATUS-INDEX.md`.
 
 ---
 

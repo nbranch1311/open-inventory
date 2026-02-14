@@ -14,6 +14,19 @@ Any exception requires product owner approval and a dated note in this doc.
 
 Environment provisioning and readiness checklist is tracked in `docs/EnvSplitChecklist001.md`.
 
+### Policy Validation Status (2026-02-14)
+
+- Dev target project ref: `vsjihxrquvhajeljhuzh` (`inventory`).
+- Staging target project ref: `lsqeeunbupisvkqpzypi` (`inventory-staging`).
+- Current validation state:
+  - Dev `confirmation OFF`: **manual dashboard verification required**.
+  - Staging `confirmation ON`: behavioral evidence exists in `docs/AuthQA-Execution-001.md`, but dashboard setting still requires manual confirmation evidence for deterministic gate closure.
+- Manual verification instruction (both environments):
+  1. Open Supabase dashboard for the environment project.
+  2. Navigate to `Authentication -> Providers -> Email`.
+  3. Verify `Confirm email` toggle matches policy (dev OFF, staging ON).
+  4. Add timestamped screenshot evidence to `docs/AuthQA-Execution-001.md`.
+
 ## Redirect Contract by State
 
 ### 1) `unauthenticated`

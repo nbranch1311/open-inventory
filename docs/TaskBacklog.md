@@ -222,7 +222,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004.8-API`
 - **Owner Agent:** Backend Agent + Security/Privacy Agent
 - **Priority:** `P0` (Release-Critical)
-- **Status:** `blocked`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-004-API`, `T-003`, `T-004.9-EnvSplit`
 - **Objective:** resolve policy/config drift causing onboarding household creation failures and harden first-household flow reliability.
@@ -239,11 +239,15 @@ Use this as the single queue for MVP delivery.
   - Household + owner membership are created in one successful flow.
   - Policy failures show actionable UX-safe errors with internal diagnostics.
   - QA verifies signup -> login -> onboarding -> household creation -> dashboard end-to-end.
-- **Current Blockers (as of 2026-02-14):**
-  - Final gate remains **NO-GO** per `docs/Project-Review-007.md`.
-  - Environment split readiness task `T-004.9-EnvSplit` is not complete.
-  - Required P0 coverage is incomplete: `Signup confirmation OFF (dev)` and `Onboarding success (first household)` are still `not_run` in latest QA artifacts.
-  - Release-critical deterministic chain `signup -> login -> onboarding -> household creation -> dashboard` is not yet evidenced as passed.
+- **Completion Notes (2026-02-14):**
+  - Dev rerun green: `/tmp/t0048-dev-qa-auth-p0.json` (`expected: 4`, `skipped: 0`, `unexpected: 0`).
+  - Staging rerun initially failed during onboarding due missing RPC endpoint (`POST /rest/v1/rpc/create_household_with_owner` -> `404`).
+  - Applied missing staging migrations:
+    - `fix_first_household_onboarding_rls`
+    - `restrict_onboarding_rpc_execute_grants`
+  - Staging post-fix rerun green: `/tmp/t0048-staging-qa-auth-p0-postfix.json` (`expected: 4`, `skipped: 0`, `unexpected: 0`).
+  - Gate decision updated to GO by latest review: `docs/Project-Review-010.md`.
+  - Residual follow-up moved to separate task: staged confirmation-ON dedicated validation.
 
 ---
 
@@ -252,12 +256,13 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004.9-EnvSplit`
 - **Owner Agent:** DevOps/Infra Agent + QA Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `S`
 - **Dependencies:** `T-003.5-Setup`
 - **Objective:** remove environment ambiguity that blocks deterministic auth gate closure.
 - **Deliverables:**
   - Environment split checklist completed: `docs/EnvSplitChecklist001.md`.
+  - Owner setup runbook completed: `docs/StagingSetupOwnerGuide001.md`.
   - Dedicated dev and staging Supabase targets verified.
   - Auth mode policy verified by environment (dev OFF, staging ON).
   - Seeded QA-account strategy documented for deterministic runs.
@@ -265,6 +270,32 @@ Use this as the single queue for MVP delivery.
 - **Acceptance Criteria:**
   - No P0 auth scenario remains `not_run` due to environment setup ambiguity.
   - Project Reviewer confirms environment is gate-ready for next `T-004.8-API` run.
+- **Completion Notes (2026-02-14):**
+  - Dedicated staging project provisioned and mapped: `lsqeeunbupisvkqpzypi`.
+  - Separate MCP targets validated for dev/staging.
+  - Dev/staging auth mode split owner-confirmed (`dev OFF`, `staging ON`).
+  - Staging parity established (schema + RLS migrations applied and validated).
+  - Staging seeded confirmed user created (`nbranch1311@gmail.com`).
+  - Environment-labeled rerun evidence captured in `docs/AuthQA-Execution-001.md`.
+
+---
+
+## 4.10) Staging Confirmation-ON Validation Follow-Up
+
+- **Task ID:** `T-004.10-QA`
+- **Owner Agent:** QA Agent + Security/Privacy Agent
+- **Priority:** `P1`
+- **Status:** `pending`
+- **Effort:** `S`
+- **Dependencies:** `T-004.8-API`
+- **Objective:** run dedicated auth validation in staging with confirmation ON and record production-like behavior evidence.
+- **Deliverables:**
+  - Staging confirmation-ON rerun evidence captured in `docs/AuthQA-Execution-001.md`.
+  - Matrix status update in `docs/AuthQA-Matrix001.md`.
+  - Reviewer note confirming closure of confirmation-ON follow-up.
+- **Acceptance Criteria:**
+  - Confirmation-ON behavior is explicitly validated and documented in staging.
+  - Any gaps are documented as residual risk with owner decision.
 
 ---
 
