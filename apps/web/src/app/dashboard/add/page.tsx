@@ -46,8 +46,8 @@ export default async function AddItemPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-6">Add New Item</h1>
+    <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="mb-6 text-2xl font-bold">Add New Item</h1>
       <AddItemForm action={addItem} />
     </div>
   )

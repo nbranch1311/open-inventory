@@ -37,7 +37,17 @@ Define the explicit owner-review baseline for auth UI alignment before `T-005.6-
 - Touch targets remain comfortably tappable (minimum 44px height intent).
 - Spacing and typography remain readable on small devices while preserving desktop centered layout.
 
-## Owner Sign-off: Pending
+## Owner Sign-off: Approved
 
-- Status: Pending
-- Blocking impact: `T-005.6-UI` remains blocked until owner approves this baseline document.
+- Status: Approved
+- Approved by: Product Owner
+- Approval date: 2026-02-14
+- Blocking impact: Removed. `T-005.6-UI` may proceed.
+
+## Implementation Notes for T-005.6-UI
+
+- Used locally implemented shadcn-style primitives (`Card`, `Input`, `Button`, `Label`, `Alert`) to align with the approved baseline while preserving current project styling tokens.
+- Login and signup route behavior remains unchanged:
+  - `login -> /dashboard`
+  - `signup -> /onboarding`
+- Error handling is now consistently rendered in an inline destructive alert region on both pages.

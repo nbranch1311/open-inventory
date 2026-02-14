@@ -141,6 +141,9 @@ The MVP is successful if a user can:
 - Email/password auth required.
 - Session handling with secure token/session storage.
 - Every data read/write must enforce household ownership boundary.
+- Redirect behavior must follow explicit state contract (`unauthenticated`, `authenticated_no_household`, `authenticated_with_household`, `expired_session`, `unconfirmed_email`).
+- Auth environment policy (email confirmation ON/OFF by environment) must be explicitly defined and documented.
+- User-facing auth error copy must follow documented error policy and avoid leaking internal diagnostics.
 
 ### Inventory
 
@@ -237,6 +240,8 @@ Each `InventoryItem` must support:
 - Use a `shadcn` auth template/pattern for login/signup as the baseline implementation direction.
 - Product owner design approval is required before major UI flow implementation or redesign.
 - After auth is working, prioritize mobile-ready responsive behavior for all core MVP screens.
+- Add app-wide theme support (light and dark mode) before broad UI surface expansion.
+- Theme behavior should be consistent across auth and authenticated screens, with a user-accessible theme toggle.
 
 ---
 

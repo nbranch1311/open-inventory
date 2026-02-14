@@ -55,7 +55,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-002`
 - **Owner Agent:** Data Modeling Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `L`
 - **Dependencies:** `T-001`
 - **Objective:** create stable schema for MVP entities and relationships.
@@ -75,7 +75,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-003`
 - **Owner Agent:** Security/Privacy Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-001`, `T-002`
 - **Objective:** define mandatory auth, access control, and data protection requirements for implementation.
@@ -116,7 +116,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `done`
+- **Status:** `in_progress`
 - **Effort:** `L`
 - **Dependencies:** `T-002`, `T-003`
 - **Objective:** deliver account signup/login and single-household setup flow.
@@ -128,6 +128,8 @@ Use this as the single queue for MVP delivery.
   - New user can sign up, log in, create household.
   - Unauthenticated access is rejected correctly.
   - QA verifies setup flow end-to-end.
+- **Blocker Note (Regression-Validation-001):**
+  - Protected-route guard behavior is drifting in runtime validation (`/onboarding` reachable; `/dashboard` redirects to `/onboarding` instead of `/login` for fresh client checks). Re-qualification required before this task can return to `done`.
 
 ---
 
@@ -136,7 +138,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `done`
+- **Status:** `in_progress`
 - **Effort:** `M`
 - **Dependencies:** `T-004-API`
 - **Objective:** build responsive login, signup, and household creation screens.
@@ -148,6 +150,121 @@ Use this as the single queue for MVP delivery.
   - Forms validate input before submission.
   - Loading states shown during auth requests.
   - Successful login redirects to inventory dashboard.
+- **Blocker Note (Regression-Validation-001):**
+  - UI flow trust depends on auth guard correctness. Current regression pass found protected-route contract drift; auth/onboarding UI must be re-verified after guard behavior is corrected.
+
+---
+
+## 4.5) Account Menu + Sign Out
+
+- **Task ID:** `T-004.5-UI`
+- **Owner Agent:** UI Frontend Engineer Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `M`
+- **Dependencies:** `T-004-API`, `T-004-UI`
+- **Objective:** add account menu and reliable sign-out behavior in desktop and mobile navigation.
+- **Deliverables:**
+  - Account menu in app shell (desktop + mobile).
+  - User identity display (email + avatar fallback).
+  - Sign-out action wired to server-side auth/session invalidation.
+- **Acceptance Criteria:**
+  - After sign out, protected routes redirect to `/login`.
+  - Browser back button does not restore authenticated pages.
+  - Works in desktop and mobile navigation variants.
+
+---
+
+## 4.6) Auth Session UX Actions
+
+- **Task ID:** `T-004.6-API`
+- **Owner Agent:** Backend Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `S`
+- **Dependencies:** `T-004-API`
+- **Objective:** harden auth session lifecycle actions and consistency between server, middleware, and client.
+- **Deliverables:**
+  - Server action for sign-out (`supabase.auth.signOut`).
+  - Optional helper for current user profile in shell context.
+  - Session invalidation consistency checks documented.
+- **Acceptance Criteria:**
+  - Session invalidates server-side and client-side.
+  - Middleware observes unauthenticated state immediately after sign-out.
+  - No stale authenticated shell state after sign-out.
+- **Verification Notes (2026-02-14):**
+  - Implemented server sign-out action at `apps/web/src/actions/auth.ts` using `supabase.auth.signOut`.
+  - Added backend tests covering sign-out success path and middleware unauthenticated protected-route contract (`/dashboard`, `/onboarding` -> `/login`).
+
+---
+
+## 4.7) Profile Baseline (Avatar + Display Name)
+
+- **Task ID:** `T-004.7-UI`
+- **Owner Agent:** UI Frontend Engineer Agent
+- **Priority:** `P1`
+- **Status:** `todo`
+- **Effort:** `M`
+- **Dependencies:** `T-004.5-UI`, `T-004.6-API`
+- **Objective:** provide minimal profile surface for display name and avatar baseline used by account menu.
+- **Deliverables:**
+  - Basic profile screen or edit modal (name and avatar URL; file upload can be later).
+  - Avatar rendering in account menu.
+  - Deterministic fallback identity rendering.
+- **Acceptance Criteria:**
+  - Profile info persists and renders in shell.
+  - Missing avatar uses stable fallback behavior.
+
+---
+
+## 4.8) Household Creation RLS Reliability Fix (Release-Critical)
+
+- **Task ID:** `T-004.8-API`
+- **Owner Agent:** Backend Agent + Security/Privacy Agent
+- **Priority:** `P0` (Release-Critical)
+- **Status:** `blocked`
+- **Effort:** `M`
+- **Dependencies:** `T-004-API`, `T-003`, `T-004.9-EnvSplit`
+- **Objective:** resolve policy/config drift causing onboarding household creation failures and harden first-household flow reliability.
+- **Deliverables:**
+  - Investigation and fix for RLS policy failure path (`42501` on `households` insert).
+  - Integration/regression coverage for first-household onboarding flow.
+  - Error handling path that does not silently mask policy failures.
+  - Auth foundation artifacts maintained and aligned:
+    - `docs/AuthFlow001.md`
+    - `docs/AuthErrorCatalog001.md`
+    - `docs/AuthQA-Matrix001.md`
+- **Acceptance Criteria:**
+  - Authenticated user can create first household from onboarding.
+  - Household + owner membership are created in one successful flow.
+  - Policy failures show actionable UX-safe errors with internal diagnostics.
+  - QA verifies signup -> login -> onboarding -> household creation -> dashboard end-to-end.
+- **Current Blockers (as of 2026-02-14):**
+  - Final gate remains **NO-GO** per `docs/Project-Review-007.md`.
+  - Environment split readiness task `T-004.9-EnvSplit` is not complete.
+  - Required P0 coverage is incomplete: `Signup confirmation OFF (dev)` and `Onboarding success (first household)` are still `not_run` in latest QA artifacts.
+  - Release-critical deterministic chain `signup -> login -> onboarding -> household creation -> dashboard` is not yet evidenced as passed.
+
+---
+
+## 4.9) Environment Split Readiness (Dev + Staging) for Auth Gate
+
+- **Task ID:** `T-004.9-EnvSplit`
+- **Owner Agent:** DevOps/Infra Agent + QA Agent
+- **Priority:** `P0`
+- **Status:** `todo`
+- **Effort:** `S`
+- **Dependencies:** `T-003.5-Setup`
+- **Objective:** remove environment ambiguity that blocks deterministic auth gate closure.
+- **Deliverables:**
+  - Environment split checklist completed: `docs/EnvSplitChecklist001.md`.
+  - Dedicated dev and staging Supabase targets verified.
+  - Auth mode policy verified by environment (dev OFF, staging ON).
+  - Seeded QA-account strategy documented for deterministic runs.
+  - `docs/AuthQA-Execution-001.md` updated with environment labels on evidence.
+- **Acceptance Criteria:**
+  - No P0 auth scenario remains `not_run` due to environment setup ambiguity.
+  - Project Reviewer confirms environment is gate-ready for next `T-004.8-API` run.
 
 ---
 
@@ -156,7 +273,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-005-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `done`
+- **Status:** `in_progress`
 - **Effort:** `L`
 - **Dependencies:** `T-004-API`
 - **Objective:** deliver create/read/update/delete flows for inventory items.
@@ -168,6 +285,8 @@ Use this as the single queue for MVP delivery.
   - Items are household-scoped for all operations.
   - Validation errors are clear and stable.
   - CRUD flows pass integration tests.
+- **Blocker Note (Regression-Validation-001):**
+  - Auth-route drift prevents trustworthy confirmation of authenticated-only CRUD behavior across dashboard/item paths. Re-validation required after auth guard contract is stabilized.
 
 ---
 
@@ -176,7 +295,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-005-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `done`
+- **Status:** `in_progress`
 - **Effort:** `L`
 - **Dependencies:** `T-005-API`
 - **Objective:** build main inventory dashboard and item add/edit forms.
@@ -188,6 +307,8 @@ Use this as the single queue for MVP delivery.
   - User can create item and see it appear in list immediately.
   - Empty states guide user to add first item.
   - Edit form pre-fills correctly.
+- **Blocker Note (Regression-Validation-001):**
+  - Dashboard/item UI surfaces remain at risk while protected-route auth behavior is inconsistent. Re-qualification needed once upstream auth guard drift is resolved.
 
 ---
 
@@ -196,7 +317,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-005.5-Review`
 - **Owner Agent:** Project Reviewer Agent + UX/Product Research Agent
 - **Priority:** `P0`
-- **Status:** `in_progress`
+- **Status:** `done`
 - **Effort:** `S`
 - **Dependencies:** `T-004-API`
 - **Objective:** align implemented and planned UI with product owner expectations before further UI expansion.
@@ -215,9 +336,9 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-005.6-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `blocked`
+- **Status:** `done`
 - **Effort:** `M`
-- **Dependencies:** `T-005.5-Review`, Owner sign-off on `docs/UiBaselineAuth001.md`
+- **Dependencies:** `T-005.5-Review`
 - **Objective:** align login/signup UX with approved `shadcn` auth template patterns.
 - **Deliverables:**
   - Updated login/signup screens using approved shadcn-based structure.
@@ -234,7 +355,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-005.7-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `in_progress`
 - **Effort:** `M`
 - **Dependencies:** `T-005.6-UI`
 - **Objective:** make post-auth core screens mobile-ready before new UI feature expansion.
@@ -245,6 +366,26 @@ Use this as the single queue for MVP delivery.
 - **Acceptance Criteria:**
   - Core authenticated screens are usable on common mobile viewport sizes.
   - Product owner validates mobile readiness baseline.
+
+---
+
+## 5.8) Theme System Baseline (Light/Dark)
+
+- **Task ID:** `T-005.8-UI`
+- **Owner Agent:** UI Frontend Engineer Agent
+- **Priority:** `P0`
+- **Status:** `todo`
+- **Effort:** `S`
+- **Dependencies:** `T-005.7-UI`
+- **Objective:** implement a consistent app-wide light/dark theme foundation before broader UI expansion.
+- **Deliverables:**
+  - Theme provider setup for app-wide light/dark support.
+  - User-accessible theme toggle (desktop and mobile-visible location).
+  - Baseline themed states verified on auth, dashboard, and item form screens.
+- **Acceptance Criteria:**
+  - Theme switch persists user preference across sessions.
+  - Core screens render correctly in both light and dark modes.
+  - Product owner approves theme behavior baseline.
 
 ---
 
@@ -275,7 +416,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-006-API`, `T-005.7-UI`
+- **Dependencies:** `T-006-API`, `T-005.8-UI`
 - **Objective:** allow users to drag-and-drop or select files for items.
 - **Deliverables:**
   - File picker/dropzone component.
@@ -315,7 +456,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-007-API`, `T-005.7-UI`
+- **Dependencies:** `T-007-API`, `T-005.8-UI`
 - **Objective:** build search bar and filter controls.
 - **Deliverables:**
   - Global search input (debounced).
@@ -355,7 +496,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-008-API`, `T-005.7-UI`
+- **Dependencies:** `T-008-API`, `T-005.8-UI`
 - **Objective:** display upcoming reminders and allow management.
 - **Deliverables:**
   - Reminder widget on dashboard.
@@ -394,7 +535,7 @@ Use this as the single queue for MVP delivery.
 - **Priority:** `P0`
 - **Status:** `todo`
 - **Effort:** `M`
-- **Dependencies:** `T-009-AI`, `T-005.7-UI`
+- **Dependencies:** `T-009-AI`, `T-005.8-UI`
 - **Objective:** chat-like interface for "Ask my inventory".
 - **Deliverables:**
   - Chat input component.
@@ -430,14 +571,18 @@ Use this as the single queue for MVP delivery.
 ## Sequencing View
 
 1. `T-001` -> `T-002` -> `T-003`
-2. `T-004-API` -> `T-004-UI` -> `T-005-API` -> `T-005-UI`
-3. `T-005.5-Review` -> `T-005.6-UI` -> `T-005.7-UI`
-4. Parallel streams:
+2. `T-004.9-EnvSplit` (prerequisite for deterministic auth gate closure)
+3. `T-004.8-API` (release-critical reliability gate)
+4. `T-004.5-UI` + `T-004.6-API`
+5. `T-004.7-UI`
+6. `T-005-API` -> `T-005-UI`
+7. `T-005.5-Review` -> `T-005.6-UI` -> `T-005.7-UI` -> `T-005.8-UI`
+8. Parallel streams:
    - `T-006-API` -> `T-006-UI`
    - `T-007-API` -> `T-007-UI`
    - `T-008-API` -> `T-008-UI`
-5. `T-009-AI` -> `T-009-UI`
-6. `T-010` closes MVP readiness
+9. `T-009-AI` -> `T-009-UI`
+10. `T-010` closes MVP readiness
 
 ---
 
@@ -447,8 +592,11 @@ These decisions should be resolved early to prevent blockers:
 
 1. Final backend stack and hosting model (from `T-001`).
 2. Auth provider selection (needed by `T-004`).
-3. File storage provider and limits (needed by `T-006`).
-4. AI provider and budget caps (needed by `T-009`).
+3. Auth environment mode policy (email confirmation ON/OFF in dev/staging/prod).
+4. Redirect contract by auth/session state (`unauthenticated`, `authenticated_no_household`, `authenticated_with_household`, `expired_session`, `unconfirmed_email`).
+5. Error copy policy (user-facing vs internal-only diagnostics).
+6. File storage provider and limits (needed by `T-006`).
+7. AI provider and budget caps (needed by `T-009`).
 
 ---
 

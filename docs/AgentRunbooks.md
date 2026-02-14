@@ -245,6 +245,7 @@ Protect core user flows and prevent regressions.
 3. Execute automated and manual checks.
 4. Report defects with severity and reproduction.
 5. Re-verify fixes and close loop.
+6. Keep auth/session/onboarding verification aligned to `docs/AuthQA-Matrix001.md`, including desktop/mobile and light/dark checks for auth surfaces.
 
 ### Must Not
 
@@ -269,6 +270,7 @@ Deploy safely with observability, backup, and rollback readiness.
 - Release candidate
 - Environment requirements
 - Security and reliability constraints
+- Environment split checklist when auth gate depends on multi-env behavior (`docs/EnvSplitChecklist001.md`)
 
 ### Procedure
 
@@ -277,6 +279,7 @@ Deploy safely with observability, backup, and rollback readiness.
 3. Ensure monitoring and alerts exist for critical paths.
 4. Validate backup/restore path.
 5. Execute staged rollout and observe.
+6. For auth gate work, confirm dev/staging auth-mode settings and QA-account readiness are documented and verified.
 
 ### Must Not
 
@@ -340,8 +343,9 @@ Implement clear, reliable user interfaces for core MVP flows.
 2. Connect UI to backend endpoints with consistent loading/error/empty states.
 3. Enforce client-side validation aligned with backend rules.
 4. Preserve accessibility and responsive behavior for web and mobile web layouts.
-5. Use `shadcn/ui` components/patterns for core form and layout primitives unless a documented exception exists.
-6. Add/update component tests for high-risk interactions.
+5. Implement and maintain consistent light/dark theme behavior across new and updated screens.
+6. Use `shadcn/ui` components/patterns for core form and layout primitives unless a documented exception exists.
+7. Add/update component tests for high-risk interactions.
 
 ### Must Not
 
@@ -349,6 +353,7 @@ Implement clear, reliable user interfaces for core MVP flows.
 - Hide critical failures behind generic messages.
 - Introduce scope-expanding UI features without product approval.
 - Ship net-new major UI flows without explicit product owner design sign-off.
+- Ship new UI with missing or broken light/dark theme behavior.
 
 ### Handoff
 
