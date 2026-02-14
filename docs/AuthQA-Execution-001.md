@@ -109,3 +109,5 @@ Combined gate result (`/tmp/t005-dual-gate-dev.json`):
 - `stats.expected: 6`
 - `stats.skipped: 0`
 - `stats.unexpected: 0`
+
+**T-005 Backend+UI pass validation (2026-02-14):** Dual gate re-run green. Unit tests (inventory, InventoryEmptyState, household) 19/19 passed. No regressions in auth contract or CRUD UX gates.

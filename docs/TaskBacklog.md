@@ -142,7 +142,7 @@ Use this as the single queue for MVP delivery.
 - **Task ID:** `T-004-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `in_progress`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-004-API`
 - **Objective:** build responsive login, signup, and household creation screens.
@@ -318,6 +318,7 @@ Use this as the single queue for MVP delivery.
 
 Verification: `pnpm --filter @open-inventory/web exec playwright test qa-auth-p0.spec.ts qa-inventory-crud.spec.ts --config playwright.config.ts`
 Latest evidence: `/tmp/t005-dual-gate-dev.json` (`expected: 6`, `skipped: 0`, `unexpected: 0`)
+QA validation (2026-02-14): Dual gate green; unit tests (inventory, InventoryEmptyState, household) 19/19 passed.
 
 Environment policy:
 - Blocking requirement for T-005 progression: dev dual-gate green.
@@ -330,7 +331,7 @@ Environment policy:
 - **Task ID:** `T-005-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `in_progress`
+- **Status:** `done`
 - **Effort:** `L`
 - **Dependencies:** `T-004-API`
 - **Objective:** deliver create/read/update/delete flows for inventory items.
@@ -349,8 +350,11 @@ Environment policy:
   - Regression-Validation-001 auth-guard drift has been requalified as green; this task is no longer blocked on route-guard uncertainty.
 - **Progress (2026-02-14):**
   - Added explicit household-scoping to update/delete (defense-in-depth).
+  - Added household-scoping to getInventoryItem (defense-in-depth; signature now requires householdId).
   - Added required-field validation for create (name, quantity, unit).
-  - Added unit tests for CRUD flows (`apps/web/src/actions/inventory.test.ts`).
+  - Added update validation for name/quantity/unit when fields are present.
+  - Added unit tests for CRUD flows (`apps/web/src/actions/inventory.test.ts`), including update validation failures and DB error paths.
+  - Reviewer re-check: GO for closure of the two outstanding findings.
 
 ---
 
@@ -376,6 +380,8 @@ Environment policy:
   - CRUD gate: `qa-inventory-crud.spec.ts` green for desktop + mobile UX states (success/error/empty-state assertions).
 - **Unblock Note (2026-02-14):**
   - Protected-route auth behavior has been revalidated as deterministic; this task is no longer blocked by Regression-Validation-001.
+- **Progress (2026-02-14):**
+  - Stronger empty-state UX: `InventoryEmptyState` component with icon, clearer copy, primary CTA, and `role="status"` for accessibility. Unit tests added.
 
 ---
 

@@ -25,13 +25,14 @@ export async function getInventoryItems(householdId: string) {
   return { data }
 }
 
-export async function getInventoryItem(itemId: string) {
+export async function getInventoryItem(itemId: string, householdId: string) {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('inventory_items')
     .select('*')
     .eq('id', itemId)
+    .eq('household_id', householdId)
     .single()
 
   if (error) {
@@ -81,6 +82,26 @@ export async function createInventoryItem(householdId: string, item: InsertItem)
 
 export async function updateInventoryItem(householdId: string, itemId: string, item: UpdateItem) {
   const supabase = await createClient()
+
+  // Validate fields when present (mirror createInventoryItem)
+  if ('name' in item) {
+    const name = (item.name ?? '').toString().trim()
+    if (!name) {
+      return { error: 'Name is required' }
+    }
+  }
+  if ('quantity' in item) {
+    const quantity = Number(item.quantity)
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return { error: 'Quantity must be a positive number' }
+    }
+  }
+  if ('unit' in item) {
+    const unit = (item.unit ?? '').toString().trim()
+    if (!unit) {
+      return { error: 'Unit is required' }
+    }
+  }
 
   const { data, error } = await supabase
     .from('inventory_items')

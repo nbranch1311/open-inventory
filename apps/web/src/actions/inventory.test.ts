@@ -107,17 +107,34 @@ describe('getInventoryItem', () => {
     vi.clearAllMocks()
   })
 
-  it('fetches single item by id', async () => {
+  it('fetches single item scoped by id and household_id', async () => {
     const harness = createSupabaseHarness()
     harness.chain.single.mockResolvedValue({ data: mockItem, error: null })
 
     mockCreateClient.mockResolvedValue(harness.client)
 
-    const result = await getInventoryItem(ITEM_ID)
+    const result = await getInventoryItem(ITEM_ID, HOUSEHOLD_ID)
 
     expect(result.data).toEqual(mockItem)
     expect(result.error).toBeUndefined()
     expect(harness.chain.eq).toHaveBeenCalledWith('id', ITEM_ID)
+    expect(harness.chain.eq).toHaveBeenCalledWith('household_id', HOUSEHOLD_ID)
+  })
+
+  it('returns error when item not found or not in household', async () => {
+    const harness = createSupabaseHarness()
+    harness.chain.single.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST116', message: 'Row not found' },
+    })
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await getInventoryItem(ITEM_ID, HOUSEHOLD_ID)
+
+    expect(result.error).toBe('Failed to fetch inventory item')
+    expect(result.data).toBeUndefined()
+    expect(harness.chain.eq).toHaveBeenCalledWith('household_id', HOUSEHOLD_ID)
   })
 })
 
@@ -226,6 +243,64 @@ describe('updateInventoryItem', () => {
     expect(harness.chain.eq).toHaveBeenCalledWith('household_id', HOUSEHOLD_ID)
     expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard')
     expect(mockRevalidatePath).toHaveBeenCalledWith(`/dashboard/${ITEM_ID}`)
+  })
+
+  it('returns error when name is empty', async () => {
+    mockCreateClient.mockResolvedValue(createSupabaseHarness().client)
+
+    const result = await updateInventoryItem(HOUSEHOLD_ID, ITEM_ID, {
+      name: '',
+      quantity: 2,
+      unit: 'pcs',
+    })
+
+    expect(result.error).toBe('Name is required')
+    expect(result.data).toBeUndefined()
+  })
+
+  it('returns error when quantity is invalid', async () => {
+    mockCreateClient.mockResolvedValue(createSupabaseHarness().client)
+
+    const result = await updateInventoryItem(HOUSEHOLD_ID, ITEM_ID, {
+      name: 'Item',
+      quantity: 0,
+      unit: 'pcs',
+    })
+
+    expect(result.error).toBe('Quantity must be a positive number')
+    expect(result.data).toBeUndefined()
+  })
+
+  it('returns error when unit is empty', async () => {
+    mockCreateClient.mockResolvedValue(createSupabaseHarness().client)
+
+    const result = await updateInventoryItem(HOUSEHOLD_ID, ITEM_ID, {
+      name: 'Item',
+      quantity: 1,
+      unit: '',
+    })
+
+    expect(result.error).toBe('Unit is required')
+    expect(result.data).toBeUndefined()
+  })
+
+  it('returns error on DB failure', async () => {
+    const harness = createSupabaseHarness()
+    harness.chain.single.mockResolvedValue({
+      data: null,
+      error: { message: 'DB error' },
+    })
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await updateInventoryItem(HOUSEHOLD_ID, ITEM_ID, {
+      name: 'Updated',
+      quantity: 1,
+      unit: 'pcs',
+    })
+
+    expect(result.error).toBe('Failed to update inventory item')
+    expect(result.data).toBeUndefined()
   })
 })
 

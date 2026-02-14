@@ -1,3 +1,4 @@
+import { getUserHouseholds } from '@/actions/household'
 import { getInventoryItem, updateInventoryItem, deleteInventoryItem } from '@/actions/inventory'
 import { redirect } from 'next/navigation'
 import { ItemDetailForm } from './item-detail-form'
@@ -6,9 +7,22 @@ type ItemFormState = {
   error: string | null
 }
 
-export default async function ItemDetailPage({ params }: { params: Promise<{ itemId: string }> }) {
+type PageProps = {
+  params: Promise<{ itemId: string }>
+  searchParams: Promise<{ household?: string }>
+}
+
+export default async function ItemDetailPage({ params, searchParams }: PageProps) {
   const { itemId } = await params
-  const { data: item, error } = await getInventoryItem(itemId)
+  const { household: householdFromUrl } = await searchParams
+  const households = await getUserHouseholds()
+  const householdId = householdFromUrl ?? households?.[0]?.id
+
+  if (!householdId) {
+    redirect('/onboarding')
+  }
+
+  const { data: item, error } = await getInventoryItem(itemId, householdId)
 
   if (error || !item) {
     return <div>Item not found</div>

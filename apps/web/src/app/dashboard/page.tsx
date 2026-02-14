@@ -1,5 +1,6 @@
 import { getUserHouseholds } from '@/actions/household'
 import { getInventoryItems } from '@/actions/inventory'
+import { InventoryEmptyState } from '@/components/inventory/InventoryEmptyState'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -34,21 +35,13 @@ export default async function DashboardPage() {
       </div>
 
       {items && items.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-[var(--border)] py-10 text-center sm:py-12">
-          <p className="mb-4 text-[var(--muted-foreground)]">No items in inventory yet.</p>
-          <Link
-            href="/dashboard/add"
-            className="inline-flex min-h-11 items-center text-[var(--primary)] hover:underline"
-          >
-            Add your first item
-          </Link>
-        </div>
+        <InventoryEmptyState />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items?.map((item) => (
             <Link
               key={item.id}
-              href={`/dashboard/${item.id}`}
+              href={`/dashboard/${item.id}?household=${selectedHousehold.id}`}
               className="block rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 transition-shadow hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-3">
