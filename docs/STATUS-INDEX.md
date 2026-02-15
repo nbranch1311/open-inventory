@@ -44,6 +44,7 @@ Use this file as the quickest reference for what matters now.
 
 - Review history: `docs/Project-Review-001.md` through `docs/Project-Review-010.md`
 - Planning draft: `docs/MonorepoPlan001.md`
+- Townhall summary: `docs/TownhallSummary001.md`
 
 ## Cleanup Policy (Current)
 
