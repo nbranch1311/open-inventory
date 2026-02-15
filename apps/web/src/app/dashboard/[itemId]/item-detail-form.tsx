@@ -2,6 +2,10 @@
 
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
+import type { ItemDocument } from '@/actions/ItemDocuments'
+import type { ItemReminder } from '@/actions/reminders'
+import { ItemDocumentsSection } from '@/components/documents/ItemDocumentsSection'
+import { ItemRemindersSection } from '@/components/reminders/ItemRemindersSection'
 
 type ItemFormState = {
   error: string | null
@@ -14,10 +18,13 @@ type ItemDetail = {
   unit: string | null
   description: string | null
   expiry_date: string | null
+  household_id: string
 }
 
 type ItemDetailFormProps = {
   item: ItemDetail
+  documents: ItemDocument[]
+  reminders: ItemReminder[]
   updateAction: (state: ItemFormState, formData: FormData) => Promise<ItemFormState>
   deleteAction: (state: ItemFormState, formData: FormData) => Promise<ItemFormState>
 }
@@ -54,7 +61,7 @@ function DeleteButton() {
   )
 }
 
-export function ItemDetailForm({ item, updateAction, deleteAction }: ItemDetailFormProps) {
+export function ItemDetailForm({ item, documents, reminders, updateAction, deleteAction }: ItemDetailFormProps) {
   const [updateState, updateFormAction] = useActionState(updateAction, initialState)
   const [deleteState, deleteFormAction] = useActionState(deleteAction, initialState)
 
@@ -121,6 +128,18 @@ export function ItemDetailForm({ item, updateAction, deleteAction }: ItemDetailF
             className="mt-1 block w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
           />
         </div>
+
+        <ItemDocumentsSection
+          householdId={item.household_id}
+          itemId={item.id}
+          documents={documents}
+        />
+
+        <ItemRemindersSection
+          householdId={item.household_id}
+          itemId={item.id}
+          reminders={reminders}
+        />
 
         <div>
           <label htmlFor="expiryDate" className="block text-sm font-medium text-[var(--foreground)]">Expiry Date</label>

@@ -165,4 +165,14 @@ test.describe('Layout and overflow', () => {
     const overlap = submitBox!.y + submitBox!.height > toggleBox!.y && submitBox!.x + submitBox!.width > toggleBox!.x
     expect(overlap).toBe(false)
   })
+
+  test('theme preference persists across reloads', async ({ page }) => {
+    await page.goto(`${BASE}/login`)
+    const toDark = page.getByRole('button', { name: /switch to dark mode/i })
+    await toDark.click()
+    await page.waitForTimeout(300)
+    await page.reload()
+    const htmlAfterReload = await page.locator('html').getAttribute('class')
+    expect(htmlAfterReload).toContain('dark')
+  })
 })

@@ -319,6 +319,7 @@ Use this as the single queue for MVP delivery.
 Verification: `pnpm --filter @open-inventory/web exec playwright test qa-auth-p0.spec.ts qa-inventory-crud.spec.ts --config playwright.config.ts`
 Latest evidence: `/tmp/t005-dual-gate-dev.json` (`expected: 6`, `skipped: 0`, `unexpected: 0`)
 QA validation (2026-02-14): Dual gate green; unit tests (inventory, InventoryEmptyState, household) 19/19 passed.
+Gate decision (2026-02-14): **GO** — T-005-UI marked done per `docs/Project-Review-011.md`.
 
 Environment policy:
 - Blocking requirement for T-005 progression: dev dual-gate green.
@@ -363,7 +364,7 @@ Environment policy:
 - **Task ID:** `T-005-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `in_progress`
+- **Status:** `done`
 - **Effort:** `L`
 - **Dependencies:** `T-005-API`
 - **Objective:** build main inventory dashboard and item add/edit forms.
@@ -382,6 +383,10 @@ Environment policy:
   - Protected-route auth behavior has been revalidated as deterministic; this task is no longer blocked by Regression-Validation-001.
 - **Progress (2026-02-14):**
   - Stronger empty-state UX: `InventoryEmptyState` component with icon, clearer copy, primary CTA, and `role="status"` for accessibility. Unit tests added.
+- **Completion Notes (2026-02-14):**
+  - Dual gate green (qa-auth-p0 + qa-inventory-crud) 6/6.
+  - InventoryEmptyState with icon, copy, primary CTA, role="status".
+  - Unit tests for InventoryEmptyState.
 
 ---
 
@@ -428,7 +433,7 @@ Environment policy:
 - **Task ID:** `T-005.7-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `in_progress`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-005.6-UI`
 - **Objective:** make post-auth core screens mobile-ready before new UI feature expansion.
@@ -439,6 +444,9 @@ Environment policy:
 - **Acceptance Criteria:**
   - Core authenticated screens are usable on common mobile viewport sizes.
   - Product owner validates mobile readiness baseline.
+- **Completion Notes (2026-02-14):**
+  - Mobile CRUD gate and qa-browser-pass mobile viewport tests pass.
+  - Responsive layout, min-h-11 tap targets, breakpoint adjustments verified.
 
 ---
 
@@ -447,7 +455,7 @@ Environment policy:
 - **Task ID:** `T-005.8-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `S`
 - **Dependencies:** `T-005.7-UI`
 - **Objective:** implement a consistent app-wide light/dark theme foundation before broader UI expansion.
@@ -459,6 +467,9 @@ Environment policy:
   - Theme switch persists user preference across sessions.
   - Core screens render correctly in both light and dark modes.
   - Product owner approves theme behavior baseline.
+- **Completion Notes (2026-02-14):**
+  - ThemeProvider + ThemeToggle wired in root layout.
+  - qa-browser-pass 13/13: theme visibility (desktop + mobile), persistence across reloads, card readability in light/dark.
 
 ---
 
@@ -467,7 +478,7 @@ Environment policy:
 - **Task ID:** `T-006-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-004-API`, `T-005-API`, `T-003`
 - **Objective:** support attaching documents/images to items securely.
@@ -479,6 +490,10 @@ Environment policy:
   - Allowed file types enforced.
   - File access checks enforce owner household.
   - Upload failures return actionable errors.
+- **Completion Notes (2026-02-14):**
+  - ItemDocuments server actions: getItemDocuments, uploadItemDocument, getItemDocumentDownloadUrl, deleteItemDocument.
+  - Household-scoped; file type (images + PDF) and size (5MB) validation.
+  - Unit tests 6/6 pass. Verify inventory-files bucket in deployment.
 
 ---
 
@@ -487,7 +502,7 @@ Environment policy:
 - **Task ID:** `T-006-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-006-API`, `T-005.8-UI`
 - **Objective:** allow users to drag-and-drop or select files for items.
@@ -499,6 +514,11 @@ Environment policy:
   - Optimistic UI shows upload progress.
   - Error messages shown for invalid types/sizes.
   - User can delete attached file.
+- **Completion Notes (2026-02-14):**
+  - ItemDocumentsSection added with click + drag/drop upload, upload spinner state, and file list with View/Delete.
+  - Client-side file validation (type/size) and server-action integration for upload/download/delete.
+  - Tests green: ItemDocuments 12/12 and ItemDocumentsSection 6/6.
+  - Review confirmation (2026-02-14): Project-Review-012 GO.
 
 ---
 
@@ -507,7 +527,7 @@ Environment policy:
 - **Task ID:** `T-007-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-005-API`
 - **Objective:** deliver keyword search, filters, and sorting for inventory.
@@ -519,6 +539,11 @@ Environment policy:
   - Results always household-scoped.
   - Search correctness validated on sample dataset.
   - Typical response stays within MVP target.
+- **Completion Notes (2026-02-14):**
+  - `searchInventoryItems(householdId, params)` with keyword (name/description ilike), categoryId, locationId, sortBy (recent/name/expiration), sortOrder.
+  - `getCategoriesForHousehold`, `getLocationsForHousehold` for filter dropdowns.
+  - Unit tests 6/6 for search behavior.
+  - Review confirmation (2026-02-14): Project-Review-012 GO.
 
 ---
 
@@ -527,7 +552,7 @@ Environment policy:
 - **Task ID:** `T-007-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-007-API`, `T-005.8-UI`
 - **Objective:** build search bar and filter controls.
@@ -539,6 +564,11 @@ Environment policy:
   - List updates as user types (or hits enter).
   - Active filters are clearly visible and dismissible.
   - "No results" state is helpful.
+- **Completion Notes (2026-02-14):**
+  - `DashboardSearchControls`: debounced search input, category/location filters (graceful when empty), sort dropdown, Clear filters button.
+  - `InventoryNoResultsState` with Clear filters CTA.
+  - URL search params drive server-side search; Suspense wraps controls for useSearchParams.
+  - Review confirmation (2026-02-14): Project-Review-012 GO.
 
 ---
 
@@ -547,7 +577,7 @@ Environment policy:
 - **Task ID:** `T-008-API`
 - **Owner Agent:** Backend Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-005-API`
 - **Objective:** support item reminders and expiration-driven reminder surfacing.
@@ -559,6 +589,12 @@ Environment policy:
   - Reminder state persists correctly.
   - Expiration-linked reminders are queryable.
   - QA validates reminder lifecycle scenarios.
+- **Completion Notes (2026-02-14):**
+  - Server actions in `apps/web/src/actions/reminders.ts`: createReminder, updateReminder, completeReminder, snoozeReminder, deleteReminder, getItemReminders, getUpcomingReminders.
+  - Household scoping enforced via assertItemOwnership and household_id filters.
+  - Clear validation errors (date required, invalid date, item not found, reminder not found).
+  - Unit tests 15/15 pass.
+  - Review confirmation (2026-02-14): Project-Review-012 GO.
 
 ---
 
@@ -567,7 +603,7 @@ Environment policy:
 - **Task ID:** `T-008-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `done`
 - **Effort:** `M`
 - **Dependencies:** `T-008-API`, `T-005.8-UI`
 - **Objective:** display upcoming reminders and allow management.
@@ -578,6 +614,11 @@ Environment policy:
 - **Acceptance Criteria:**
   - User sees visual indicator for overdue/soon items.
   - Action (snooze/complete) updates UI immediately.
+- **Completion Notes (2026-02-14):**
+  - ItemRemindersSection in item detail: create/edit reminder form, complete/snooze/delete actions, empty state.
+  - UpcomingRemindersSection on dashboard: list of upcoming reminders with complete/snooze, empty state, error state when fetch fails.
+  - Overdue reminders styled in red. Unit tests 4/4 for ItemRemindersSection.
+  - Review confirmation (2026-02-14): Project-Review-012 GO.
 
 ---
 

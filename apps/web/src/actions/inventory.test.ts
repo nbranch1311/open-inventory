@@ -18,6 +18,7 @@ import {
   deleteInventoryItem,
   getInventoryItems,
   getInventoryItem,
+  searchInventoryItems,
   updateInventoryItem,
 } from './inventory'
 
@@ -49,6 +50,7 @@ function createSupabaseHarness(
   chain.update = vi.fn().mockImplementation(() => chain)
   chain.delete = vi.fn().mockImplementation(() => chain)
   chain.eq = vi.fn().mockImplementation(() => chain)
+  chain.or = vi.fn().mockImplementation(() => chain)
   chain.order = vi.fn().mockImplementation(() => chain)
   chain.single = vi.fn()
 
@@ -66,6 +68,106 @@ function createSupabaseHarness(
 
   return { client, from, chain }
 }
+
+describe('searchInventoryItems', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('fetches items scoped by household_id with default sort', async () => {
+    const harness = createSupabaseHarness({ data: [mockItem], error: null })
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await searchInventoryItems(HOUSEHOLD_ID)
+
+    expect(result.data).toEqual([mockItem])
+    expect(result.error).toBeUndefined()
+    expect(harness.from).toHaveBeenCalledWith('inventory_items')
+    expect(harness.chain.eq).toHaveBeenCalledWith('household_id', HOUSEHOLD_ID)
+    expect(harness.chain.order).toHaveBeenCalledWith('created_at', {
+      ascending: false,
+    })
+    expect(harness.chain.or).not.toHaveBeenCalled()
+  })
+
+  it('applies keyword search with or filter', async () => {
+    const harness = createSupabaseHarness({ data: [mockItem], error: null })
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await searchInventoryItems(HOUSEHOLD_ID, {
+      keyword: 'battery',
+    })
+
+    expect(result.data).toEqual([mockItem])
+    expect(harness.chain.or).toHaveBeenCalledWith(
+      'name.ilike.%battery%,description.ilike.%battery%',
+    )
+  })
+
+  it('applies category and location filters', async () => {
+    const harness = createSupabaseHarness({ data: [], error: null })
+    const catId = 'cat-1'
+    const locId = 'loc-1'
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    await searchInventoryItems(HOUSEHOLD_ID, {
+      categoryId: catId,
+      locationId: locId,
+    })
+
+    expect(harness.chain.eq).toHaveBeenCalledWith('household_id', HOUSEHOLD_ID)
+    expect(harness.chain.eq).toHaveBeenCalledWith('category_id', catId)
+    expect(harness.chain.eq).toHaveBeenCalledWith('location_id', locId)
+  })
+
+  it('sorts by name when sortBy is name', async () => {
+    const harness = createSupabaseHarness({ data: [], error: null })
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    await searchInventoryItems(HOUSEHOLD_ID, {
+      sortBy: 'name',
+      sortOrder: 'asc',
+    })
+
+    expect(harness.chain.order).toHaveBeenCalledWith('name', {
+      ascending: true,
+    })
+  })
+
+  it('sorts by expiration when sortBy is expiration', async () => {
+    const harness = createSupabaseHarness({ data: [], error: null })
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    await searchInventoryItems(HOUSEHOLD_ID, {
+      sortBy: 'expiration',
+      sortOrder: 'asc',
+    })
+
+    expect(harness.chain.order).toHaveBeenCalledWith('expiry_date', {
+      ascending: true,
+      nullsFirst: false,
+    })
+  })
+
+  it('returns error on fetch failure', async () => {
+    const harness = createSupabaseHarness({
+      data: null,
+      error: { message: 'DB error' },
+    })
+
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await searchInventoryItems(HOUSEHOLD_ID)
+
+    expect(result.error).toBe('Failed to fetch inventory items')
+    expect(result.data).toBeUndefined()
+  })
+})
 
 describe('getInventoryItems', () => {
   beforeEach(() => {

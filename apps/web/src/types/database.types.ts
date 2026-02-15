@@ -336,6 +336,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_household_with_owner: {
+        Args: { household_name: string }
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }[]
+      }
       get_my_household_ids: { Args: never; Returns: string[] }
       is_household_admin: {
         Args: { lookup_household_id: string }

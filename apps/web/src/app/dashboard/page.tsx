@@ -1,10 +1,25 @@
 import { getUserHouseholds } from '@/actions/household'
-import { getInventoryItems } from '@/actions/inventory'
+import {
+  getCategoriesForHousehold,
+  getLocationsForHousehold,
+  searchInventoryItems,
+} from '@/actions/inventory'
+import { getUpcomingReminders } from '@/actions/reminders'
+import { DashboardSearchControls } from '@/components/inventory/DashboardSearchControls'
 import { InventoryEmptyState } from '@/components/inventory/InventoryEmptyState'
+import { InventoryNoResultsState } from '@/components/inventory/InventoryNoResultsState'
+import { UpcomingRemindersSection } from '@/components/reminders/UpcomingRemindersSection'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
-export default async function DashboardPage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) {
   const households = await getUserHouseholds()
 
   if (!households || households.length === 0) {
@@ -12,7 +27,44 @@ export default async function DashboardPage() {
   }
 
   const selectedHousehold = households[0]
-  const { data: items, error } = await getInventoryItems(selectedHousehold.id)
+  const params = await searchParams
+
+  const q = typeof params?.q === 'string' ? params.q : undefined
+  const categoryId = typeof params?.category === 'string' ? params.category : undefined
+  const locationId = typeof params?.location === 'string' ? params.location : undefined
+  const sortBy =
+    typeof params?.sort === 'string' &&
+    (params.sort === 'recent' || params.sort === 'name' || params.sort === 'expiration')
+      ? params.sort
+      : 'recent'
+
+  const hasSearchParams = Boolean(
+    q || categoryId || locationId || (typeof params?.sort === 'string' && params.sort !== 'recent'),
+  )
+
+  const { data: items, error } = await searchInventoryItems(selectedHousehold.id, {
+    keyword: q,
+    categoryId,
+    locationId,
+    sortBy,
+    sortOrder:
+      sortBy === 'name'
+        ? 'asc'
+        : sortBy === 'expiration'
+          ? 'asc'
+          : 'desc',
+  })
+
+  const [categoriesRes, locationsRes, remindersRes] = await Promise.all([
+    getCategoriesForHousehold(selectedHousehold.id),
+    getLocationsForHousehold(selectedHousehold.id),
+    getUpcomingReminders(selectedHousehold.id, 10),
+  ])
+
+  const categories = categoriesRes.data ?? []
+  const locations = locationsRes.data ?? []
+  const upcomingReminders = remindersRes.error ? [] : (remindersRes.data ?? [])
+  const remindersError = remindersRes.error
 
   if (error) {
     return (
@@ -21,6 +73,9 @@ export default async function DashboardPage() {
       </div>
     )
   }
+
+  const isEmpty = !items || items.length === 0
+  const showNoResultsState = isEmpty && hasSearchParams
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -34,7 +89,31 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {items && items.length === 0 ? (
+      <Suspense fallback={null}>
+        <DashboardSearchControls
+          categories={categories}
+          locations={locations}
+        />
+      </Suspense>
+
+      <div className="mb-6">
+        {remindersError ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              Could not load reminders. {remindersError}
+            </p>
+          </div>
+        ) : (
+          <UpcomingRemindersSection
+            reminders={upcomingReminders}
+            householdId={selectedHousehold.id}
+          />
+        )}
+      </div>
+
+      {showNoResultsState ? (
+        <InventoryNoResultsState />
+      ) : isEmpty ? (
         <InventoryEmptyState />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

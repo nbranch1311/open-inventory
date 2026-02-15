@@ -29,6 +29,8 @@ Use this file as the quickest reference for what matters now.
 - Auth UI baseline: `docs/UiBaselineAuth001.md`
 - Theme baseline: `docs/ThemeBaseline001.md`
 - Mobile baseline: `docs/MobileReadyFoundation001.md`
+- Product/feature brainstorm: `docs/ProductFeatureBrainstorm001.md`
+- AI brainstorm strategy: `docs/AI-Feature-Strategy.md`
 
 ## Architecture and Security
 
@@ -36,6 +38,7 @@ Use this file as the quickest reference for what matters now.
 - Schema source: `docs/Schema-MVP-v1.sql`
 - RLS source: `docs/Security-RLS-v1.sql`
 - Security baseline: `docs/Security-Baseline.md`
+- Event/streaming adoption checklist: `docs/AdoptionTriggerChecklist001.md`
 
 ## Historical but Useful
 

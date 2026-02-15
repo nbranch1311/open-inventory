@@ -1,5 +1,7 @@
 import { getUserHouseholds } from '@/actions/household'
 import { getInventoryItem, updateInventoryItem, deleteInventoryItem } from '@/actions/inventory'
+import { getItemDocuments } from '@/actions/ItemDocuments'
+import { getItemReminders } from '@/actions/reminders'
 import { redirect } from 'next/navigation'
 import { ItemDetailForm } from './item-detail-form'
 
@@ -22,11 +24,20 @@ export default async function ItemDetailPage({ params, searchParams }: PageProps
     redirect('/onboarding')
   }
 
-  const { data: item, error } = await getInventoryItem(itemId, householdId)
+  const [itemResult, docsResult, remindersResult] = await Promise.all([
+    getInventoryItem(itemId, householdId),
+    getItemDocuments(householdId, itemId),
+    getItemReminders(householdId, itemId),
+  ])
+
+  const { data: item, error } = itemResult
+  const documents = docsResult.error ? [] : (docsResult.data ?? [])
+  const reminders = remindersResult.error ? [] : (remindersResult.data ?? [])
 
   if (error || !item) {
     return <div>Item not found</div>
   }
+  const itemRecord = item
 
   async function updateItem(previousState: ItemFormState, formData: FormData): Promise<ItemFormState> {
     'use server'
@@ -42,7 +53,7 @@ export default async function ItemDetailPage({ params, searchParams }: PageProps
       return { error: 'Name, quantity, and unit are required.' }
     }
 
-    const { error } = await updateInventoryItem(item.household_id, itemId, {
+    const { error } = await updateInventoryItem(itemRecord.household_id, itemId, {
       name,
       quantity,
       unit,
@@ -62,7 +73,7 @@ export default async function ItemDetailPage({ params, searchParams }: PageProps
     void previousState
     void formData
 
-    const { error } = await deleteInventoryItem(item.household_id, itemId)
+    const { error } = await deleteInventoryItem(itemRecord.household_id, itemId)
     if (error) {
       return { error }
     }
@@ -71,6 +82,12 @@ export default async function ItemDetailPage({ params, searchParams }: PageProps
   }
 
   return (
-    <ItemDetailForm item={item} updateAction={updateItem} deleteAction={deleteItem} />
+    <ItemDetailForm
+      item={itemRecord}
+      documents={documents ?? []}
+      reminders={reminders}
+      updateAction={updateItem}
+      deleteAction={deleteItem}
+    />
   )
 }
