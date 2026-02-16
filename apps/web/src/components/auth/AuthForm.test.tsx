@@ -32,7 +32,7 @@ describe('AuthForm', () => {
       <AuthForm
         mode="signup"
         title="Create your account"
-        description="Start organizing your household inventory."
+        description="Start organizing your Inventory Space."
         submitLabel="Sign up"
         switchHref="/login"
         switchLabel="Sign in"

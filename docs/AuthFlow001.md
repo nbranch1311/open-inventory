@@ -4,6 +4,8 @@
 
 Define the auth/session state machine and redirect contract for MVP.
 
+Terminology note: UX uses **Inventory Space** while internal state names and data model still use `household`.
+
 ## Auth Mode Policy (By Environment)
 
 - Development: Email confirmation can be OFF for fast local iteration.
@@ -35,7 +37,7 @@ Environment provisioning and readiness checklist is tracked in `docs/EnvSplitChe
 - Blocked/protected: `/dashboard`, `/onboarding`, and authenticated app routes.
 - Redirect rule: protected routes -> `/login`.
 
-### 2) `authenticated_no_household`
+### 2) `authenticated_no_household` (authenticated_no_inventory_space in UX copy)
 
 - Allowed: `/onboarding`, account-related routes.
 - Redirect rule:

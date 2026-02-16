@@ -17,18 +17,18 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 
 export default function OnboardingPage() {
-  const [householdName, setHouseholdName] = useState('')
+  const [inventorySpaceName, setInventorySpaceName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleCreateHousehold = async (e: React.FormEvent) => {
+  const handleCreateInventorySpace = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const result = await createHousehold(householdName)
+      const result = await createHousehold(inventorySpaceName)
 
       if (result.errorCode === 'unauthenticated') {
         router.push('/login')
@@ -42,7 +42,7 @@ export default function OnboardingPage() {
 
       router.push('/dashboard')
     } catch {
-      setError('Failed to create household. Please try again.')
+      setError('Failed to create inventory space. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -54,22 +54,22 @@ export default function OnboardingPage() {
         <CardHeader className="space-y-2 text-center">
           <CardTitle>Welcome! Let&apos;s get started.</CardTitle>
           <CardDescription>
-            Create your first household to start managing your inventory.
+            Create your first Inventory Space to start managing your inventory.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <form className="space-y-4" onSubmit={handleCreateHousehold}>
+          <form className="space-y-4" onSubmit={handleCreateInventorySpace}>
             <div className="space-y-2">
-              <Label htmlFor="household-name">Household Name</Label>
+              <Label htmlFor="inventory-space-name">Inventory Space Name</Label>
               <Input
-                id="household-name"
-                name="householdName"
+                id="inventory-space-name"
+                name="inventorySpaceName"
                 type="text"
                 required
-                value={householdName}
-                onChange={(event) => setHouseholdName(event.target.value)}
-                placeholder="Household Name (e.g. Home)"
+                value={inventorySpaceName}
+                onChange={(event) => setInventorySpaceName(event.target.value)}
+                placeholder="Inventory Space Name (e.g. Home)"
               />
             </div>
 
@@ -79,10 +79,10 @@ export default function OnboardingPage() {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating household...
+                  Creating inventory space...
                 </>
               ) : (
-                'Create Household'
+                'Create Inventory Space'
               )}
             </Button>
           </form>

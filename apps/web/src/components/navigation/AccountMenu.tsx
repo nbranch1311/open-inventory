@@ -72,9 +72,6 @@ export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
           <Button asChild variant="secondary">
             <Link href="/dashboard">Dashboard</Link>
           </Button>
-          <Button asChild variant="secondary">
-            <Link href="/dashboard/add">Add Item</Link>
-          </Button>
         </nav>
 
         <div className="hidden sm:block">
@@ -133,9 +130,6 @@ export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
           <nav className="mb-4 grid gap-2">
             <Button asChild variant="secondary" className="justify-start">
               <Link href="/dashboard">Dashboard</Link>
-            </Button>
-            <Button asChild variant="secondary" className="justify-start">
-              <Link href="/dashboard/add">Add Item</Link>
             </Button>
           </nav>
 

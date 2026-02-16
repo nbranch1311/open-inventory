@@ -1,92 +1,60 @@
-# Browser QA Pass Report — localhost:3000
+# QA Browser Report - T-008.10-QA Pre-AI Usability Gate
 
-**Date:** 2026-02-14  
-**Method:** Playwright automation (Chromium)  
-**Spec:** `qa-browser-pass.spec.ts`
+Date: 2026-02-16
+Pod: Testing/QA + Project Reviewer execution pod
 
----
+## Scope
 
-## Summary
+- Tabs render only when >1 space
+- Room management behavior (create/rename/delete with non-empty warning)
+- Space edit mode (rename/delete with non-empty warning)
+- Room-required add-item behavior
+- In-room search/sort and add-item entry placement
+- Bulk move flow with deterministic failure messaging
+- Space/room limits behavior
+- Desktop + mobile checks
 
-**12/12 tests passed.** No concrete runtime issues were found during this pass.
+## Dedicated E2E Coverage Added
 
----
+- `apps/web/qa-inventory-space-management.spec.ts`
+  - New `T-008.10 pre-AI usability QA gate` suite:
+    - Desktop gate scenario covering tabs, room flows, space edit mode, room-required add path, in-room search/sort, stale-item deterministic bulk-move failure, and limit checks.
+    - Mobile gate scenario covering room-surface controls and in-room add-item placement.
 
-## Verified Behavior
+## Commands Run and Exact Results
 
-### 1. Login & Signup (Desktop 1280×720, Mobile 375×667)
+1) E2E gate run:
 
-| Check | Result |
-|------|--------|
-| Layout renders correctly | ✓ |
-| Theme toggle visible | ✓ |
-| Theme toggle switches light ↔ dark | ✓ |
-| Auth cards readable in light mode | ✓ |
-| Auth cards readable in dark mode | ✓ |
-| No horizontal overflow at 320px | ✓ |
-| Theme toggle does not obscure submit button at 375px | ✓ |
+`env -u CI pnpm --filter @open-inventory/web exec playwright test qa-inventory-space-management.spec.ts --config playwright.config.ts`
 
-### 2. Theme Toggle
+Result:
+- `2 failed`
+- Failures:
+  - desktop gate test failed while creating first room
+  - mobile gate test failed while creating first room
+- Observed UI state in both failures:
+  - room create form submitted
+  - alert rendered: `Failed to create room`
+  - no room created
 
-- Visible at `fixed bottom-4 right-4` (bottom-6 right-6 on md+)
-- `aria-label` present ("Switch to dark mode" / "Switch to light mode")
-- Toggling updates `html` class (light ↔ dark)
-- Card backgrounds and text remain readable in both themes
+2) Supporting deterministic contract/unit coverage:
 
-### 3. Auth-Gated Routes
+`pnpm --filter @open-inventory/web test src/components/inventory/RoomDashboardSurface.test.tsx src/app/dashboard/page.test.tsx src/actions/rooms.test.ts src/actions/household.test.ts src/actions/inventory.test.ts`
 
-| Route | Observed Behavior |
-|-------|-------------------|
-| `/onboarding` | Accessible (no redirect to login in this run) |
-| `/dashboard` | Accessible |
-| `/dashboard/add` | Redirects to `/onboarding` when no household; otherwise accessible |
+Result:
+- `5 passed (5)`
+- `55 passed (55)`
 
-**Note:** Auth behavior depends on environment (Supabase config, cookies). Middleware redirects unauthenticated users to `/login` for `/dashboard` and `/onboarding`.
+## Evidence Summary
 
-### 4. Onboarding (when accessible)
+- E2E gate could not progress beyond room creation for a newly created owner space.
+- Because room creation is a prerequisite for room-centric flows, the following scope items could not be deterministically validated end-to-end in runtime:
+  - room rename/delete warning flow,
+  - in-room add/search/sort placement behavior,
+  - stale-item bulk move failure flow.
+- Contract-level tests still pass for warnings, limits, and deterministic messaging paths, but runtime E2E behavior is currently blocked by room creation failure.
 
-- Card visible and readable in light and dark mode
-- Form fields and primary button themed correctly
+## QA Verdict
 
-### 5. Dashboard & Add (when accessible)
-
-- Headings visible
-- No horizontal overflow at 1280px
-
----
-
-## What Looked Good
-
-- Responsive layout at 320px, 375px, 1280px
-- Theme toggle works and is accessible
-- Auth/onboarding cards use theme tokens and stay readable in both themes
-- No horizontal overflow on login/signup at 320px
-- Theme toggle does not overlap submit button on login at 375px
-- Protected routes resolve without 500 errors
-
----
-
-## Verified Issues
-
-**None.** All automated checks passed.
-
----
-
-## Manual Review
-
-You can manually review at **http://localhost:3000**:
-
-1. Start dev server: `pnpm run dev` (from monorepo root)
-2. Visit: `/login`, `/signup`, `/onboarding`, `/dashboard`, `/dashboard/add`
-3. Test theme toggle on each page
-4. Resize to 320px and 768px to verify mobile/desktop layouts
-
----
-
-## Re-run QA
-
-```bash
-cd apps/web && pnpm exec playwright test qa-browser-pass.spec.ts --project=chromium
-```
-
-The config starts the dev server automatically if it is not already running.
+- Gate verdict for `T-008.10-QA`: **NO-GO**
+- Reason: runtime blocker in core room creation path (`Failed to create room`) on both desktop and mobile flows.

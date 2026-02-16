@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "OpenInventory",
-  description: "OpenInventory helps households track inventory, quantities, and expiration dates.",
+  description: "OpenInventory helps users track inventory in their Inventory Space, including quantities and expiration dates.",
 };
 
 export const viewport: Viewport = {

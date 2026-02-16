@@ -19,6 +19,92 @@ export type SearchInventoryParams = {
   sortOrder?: InventorySortOrder
 }
 
+type RoomRecord = Pick<Database['public']['Tables']['rooms']['Row'], 'id' | 'household_id'>
+
+type MoveInventoryErrorCode =
+  | 'unauthenticated'
+  | 'destination_room_not_found'
+  | 'destination_room_forbidden'
+  | 'item_not_found'
+  | 'source_item_forbidden'
+  | 'move_failed'
+
+type MoveInventoryResult = {
+  success: boolean
+  data?: Pick<InventoryItem, 'id' | 'household_id' | 'room_id'>
+  error?: string
+  errorCode?: MoveInventoryErrorCode
+}
+
+type BulkMoveFailureReason =
+  | 'item_not_found_or_forbidden'
+  | 'forbidden_source_household'
+  | 'update_failed'
+
+type BulkMoveFailure = {
+  itemId: string
+  reason: BulkMoveFailureReason
+}
+
+type BulkMoveInventoryResult = {
+  success: boolean
+  movedItemIds: string[]
+  failures: BulkMoveFailure[]
+  error?: string
+  errorCode?:
+    | 'invalid_input'
+    | 'unauthenticated'
+    | 'destination_room_not_found'
+    | 'destination_room_forbidden'
+    | 'validation_failed'
+    | 'move_failed'
+}
+
+async function getAuthenticatedUserId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user?.id ?? null
+}
+
+async function getRoomById(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  roomId: string,
+): Promise<RoomRecord | null> {
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('id, household_id')
+    .eq('id', roomId)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return data
+}
+
+async function userCanAccessHousehold(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  householdId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('household_members')
+    .select('household_id')
+    .eq('user_id', userId)
+    .eq('household_id', householdId)
+    .limit(1)
+
+  if (error) {
+    return false
+  }
+
+  return (data ?? []).length > 0
+}
+
 export async function searchInventoryItems(
   householdId: string,
   params: SearchInventoryParams = {},
@@ -157,10 +243,29 @@ export async function createInventoryItem(householdId: string, item: InsertItem)
   if (!unit) {
     return { error: 'Unit is required' }
   }
+  const roomId = (item.room_id ?? '').toString().trim()
+  if (!roomId) {
+    return { error: 'Room is required' }
+  }
+
+  const userId = await getAuthenticatedUserId(supabase)
+  if (!userId) {
+    return { error: 'User not authenticated' }
+  }
+
+  const room = await getRoomById(supabase, roomId)
+  if (!room || room.household_id !== householdId) {
+    return { error: 'Room not found for inventory space' }
+  }
+
+  const hasAccess = await userCanAccessHousehold(supabase, userId, householdId)
+  if (!hasAccess) {
+    return { error: 'Access denied for inventory space' }
+  }
 
   const { data, error } = await supabase
     .from('inventory_items')
-    .insert({ ...item, household_id: householdId })
+    .insert({ ...item, household_id: householdId, room_id: roomId })
     .select()
     .single()
 
@@ -193,6 +298,32 @@ export async function updateInventoryItem(householdId: string, itemId: string, i
     const unit = (item.unit ?? '').toString().trim()
     if (!unit) {
       return { error: 'Unit is required' }
+    }
+  }
+  if ('room_id' in item) {
+    const roomId = (item.room_id ?? '').toString().trim()
+    if (!roomId) {
+      return { error: 'Room is required' }
+    }
+
+    const userId = await getAuthenticatedUserId(supabase)
+    if (!userId) {
+      return { error: 'User not authenticated' }
+    }
+
+    const room = await getRoomById(supabase, roomId)
+    if (!room || room.household_id !== householdId) {
+      return { error: 'Room not found for inventory space' }
+    }
+
+    const hasAccess = await userCanAccessHousehold(supabase, userId, householdId)
+    if (!hasAccess) {
+      return { error: 'Access denied for inventory space' }
+    }
+
+    item = {
+      ...item,
+      room_id: roomId,
     }
   }
 
@@ -234,4 +365,270 @@ export async function deleteInventoryItem(householdId: string, itemId: string) {
   revalidatePath('/dashboard')
   revalidatePath(`/dashboard/${itemId}`)
   return { success: true }
+}
+
+export async function moveInventoryItem(
+  itemId: string,
+  destinationRoomId: string,
+): Promise<MoveInventoryResult> {
+  const supabase = await createClient()
+  const userId = await getAuthenticatedUserId(supabase)
+
+  if (!userId) {
+    return {
+      success: false,
+      error: 'User not authenticated',
+      errorCode: 'unauthenticated',
+    }
+  }
+
+  const destinationRoom = await getRoomById(supabase, destinationRoomId)
+  if (!destinationRoom) {
+    return {
+      success: false,
+      error: 'Destination room not found',
+      errorCode: 'destination_room_not_found',
+    }
+  }
+
+  const canAccessDestination = await userCanAccessHousehold(
+    supabase,
+    userId,
+    destinationRoom.household_id,
+  )
+  if (!canAccessDestination) {
+    return {
+      success: false,
+      error: 'Cannot access destination inventory space',
+      errorCode: 'destination_room_forbidden',
+    }
+  }
+
+  const { data: sourceItem, error: sourceError } = await supabase
+    .from('inventory_items')
+    .select('id, household_id, room_id')
+    .eq('id', itemId)
+    .single()
+
+  if (sourceError || !sourceItem) {
+    return {
+      success: false,
+      error: 'Item not found',
+      errorCode: 'item_not_found',
+    }
+  }
+
+  const canAccessSource = await userCanAccessHousehold(supabase, userId, sourceItem.household_id)
+  if (!canAccessSource) {
+    return {
+      success: false,
+      error: 'Cannot access source item inventory space',
+      errorCode: 'source_item_forbidden',
+    }
+  }
+
+  const { data: updatedItem, error: updateError } = await supabase
+    .from('inventory_items')
+    .update({
+      household_id: destinationRoom.household_id,
+      room_id: destinationRoom.id,
+    })
+    .eq('id', sourceItem.id)
+    .eq('household_id', sourceItem.household_id)
+    .select('id, household_id, room_id')
+    .single()
+
+  if (updateError || !updatedItem) {
+    return {
+      success: false,
+      error: 'Failed to move item',
+      errorCode: 'move_failed',
+    }
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath(`/dashboard/${itemId}`)
+  return {
+    success: true,
+    data: updatedItem,
+  }
+}
+
+export async function bulkMoveInventoryItems(
+  itemIds: string[],
+  destinationRoomId: string,
+): Promise<BulkMoveInventoryResult> {
+  const normalizedItemIds = Array.from(
+    new Set(itemIds.map((id) => id.trim()).filter((id) => id.length > 0)),
+  )
+  if (normalizedItemIds.length === 0) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures: [],
+      error: 'At least one item is required',
+      errorCode: 'invalid_input',
+    }
+  }
+
+  const supabase = await createClient()
+  const userId = await getAuthenticatedUserId(supabase)
+  if (!userId) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures: normalizedItemIds.map((itemId) => ({
+        itemId,
+        reason: 'item_not_found_or_forbidden',
+      })),
+      error: 'User not authenticated',
+      errorCode: 'unauthenticated',
+    }
+  }
+
+  const destinationRoom = await getRoomById(supabase, destinationRoomId)
+  if (!destinationRoom) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures: normalizedItemIds.map((itemId) => ({
+        itemId,
+        reason: 'item_not_found_or_forbidden',
+      })),
+      error: 'Destination room not found',
+      errorCode: 'destination_room_not_found',
+    }
+  }
+
+  const canAccessDestination = await userCanAccessHousehold(
+    supabase,
+    userId,
+    destinationRoom.household_id,
+  )
+  if (!canAccessDestination) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures: normalizedItemIds.map((itemId) => ({
+        itemId,
+        reason: 'item_not_found_or_forbidden',
+      })),
+      error: 'Cannot access destination inventory space',
+      errorCode: 'destination_room_forbidden',
+    }
+  }
+
+  const { data: sourceItems, error: sourceItemsError } = await supabase
+    .from('inventory_items')
+    .select('id, household_id, room_id')
+    .in('id', normalizedItemIds)
+
+  if (sourceItemsError) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures: normalizedItemIds.map((itemId) => ({
+        itemId,
+        reason: 'update_failed',
+      })),
+      error: 'Failed to validate source items',
+      errorCode: 'move_failed',
+    }
+  }
+
+  const sourceItemMap = new Map((sourceItems ?? []).map((item) => [item.id, item]))
+  const sourceHouseholdIds = Array.from(new Set((sourceItems ?? []).map((item) => item.household_id)))
+  const { data: memberRows, error: memberError } = await supabase
+    .from('household_members')
+    .select('household_id')
+    .eq('user_id', userId)
+    .in('household_id', sourceHouseholdIds)
+
+  if (memberError) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures: normalizedItemIds.map((itemId) => ({
+        itemId,
+        reason: 'update_failed',
+      })),
+      error: 'Failed to validate ownership',
+      errorCode: 'move_failed',
+    }
+  }
+
+  const accessibleSourceHouseholdIds = new Set((memberRows ?? []).map((row) => row.household_id))
+  const failures: BulkMoveFailure[] = []
+  for (const itemId of normalizedItemIds) {
+    const sourceItem = sourceItemMap.get(itemId)
+    if (!sourceItem) {
+      failures.push({
+        itemId,
+        reason: 'item_not_found_or_forbidden',
+      })
+      continue
+    }
+
+    if (!accessibleSourceHouseholdIds.has(sourceItem.household_id)) {
+      failures.push({
+        itemId,
+        reason: 'forbidden_source_household',
+      })
+    }
+  }
+
+  if (failures.length > 0) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures,
+      error: 'One or more items failed validation',
+      errorCode: 'validation_failed',
+    }
+  }
+
+  const { data: updatedRows, error: updateError } = await supabase
+    .from('inventory_items')
+    .update({
+      household_id: destinationRoom.household_id,
+      room_id: destinationRoom.id,
+    })
+    .in('id', normalizedItemIds)
+    .select('id')
+
+  if (updateError) {
+    return {
+      success: false,
+      movedItemIds: [],
+      failures: normalizedItemIds.map((itemId) => ({
+        itemId,
+        reason: 'update_failed',
+      })),
+      error: 'Failed to move items',
+      errorCode: 'move_failed',
+    }
+  }
+
+  const updatedItemIds = (updatedRows ?? []).map((row) => row.id)
+  if (updatedItemIds.length !== normalizedItemIds.length) {
+    const updatedItemIdSet = new Set(updatedItemIds)
+    const unresolvedIds = normalizedItemIds.filter((itemId) => !updatedItemIdSet.has(itemId))
+    return {
+      success: false,
+      movedItemIds: updatedItemIds,
+      failures: unresolvedIds.map((itemId) => ({
+        itemId,
+        reason: 'update_failed',
+      })),
+      error: 'Move operation completed with unresolved items',
+      errorCode: 'move_failed',
+    }
+  }
+
+  revalidatePath('/dashboard')
+  return {
+    success: true,
+    movedItemIds: updatedItemIds,
+    failures: [],
+  }
 }

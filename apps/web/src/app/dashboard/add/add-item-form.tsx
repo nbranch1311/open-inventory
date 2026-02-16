@@ -2,6 +2,12 @@
 
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
+import { Alert } from '@/components/ui/Alert'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/Label'
+import { Select } from '@/components/ui/Select'
+import { Textarea } from '@/components/ui/Textarea'
 
 type AddItemFormState = {
   error: string | null
@@ -9,6 +15,8 @@ type AddItemFormState = {
 
 type AddItemFormProps = {
   action: (state: AddItemFormState, formData: FormData) => Promise<AddItemFormState>
+  rooms: Array<{ id: string; name: string }>
+  defaultRoomId?: string | null
 }
 
 const initialState: AddItemFormState = {
@@ -19,79 +27,96 @@ function SubmitButton() {
   const { pending } = useFormStatus()
 
   return (
-    <button
+    <Button
       type="submit"
       disabled={pending}
-      className="flex min-h-11 w-full justify-center rounded-md border border-transparent bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] shadow-sm hover:brightness-110 disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
+      className="w-full"
     >
       {pending ? 'Saving...' : 'Add Item'}
-    </button>
+    </Button>
   )
 }
 
-export function AddItemForm({ action }: AddItemFormProps) {
+export function AddItemForm({ action, rooms, defaultRoomId }: AddItemFormProps) {
   const [state, formAction] = useActionState(action, initialState)
 
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-[var(--foreground)]">Name</label>
-        <input
+        <Label htmlFor="name">Name</Label>
+        <Input
           type="text"
           name="name"
           id="name"
           required
-          className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+          className="mt-1"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="quantity" className="block text-sm font-medium text-[var(--foreground)]">Quantity</label>
-          <input
+          <Label htmlFor="quantity">Quantity</Label>
+          <Input
             type="number"
             name="quantity"
             id="quantity"
             required
             step="0.01"
-            className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+            className="mt-1"
           />
         </div>
         <div>
-          <label htmlFor="unit" className="block text-sm font-medium text-[var(--foreground)]">Unit</label>
-          <input
+          <Label htmlFor="unit">Unit</Label>
+          <Input
             type="text"
             name="unit"
             id="unit"
             required
-            className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+            className="mt-1"
             placeholder="pcs, kg, l"
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="description" className="block text-sm font-medium text-[var(--foreground)]">Description</label>
-        <textarea
+        <Label htmlFor="roomId">Room</Label>
+        <Select
+          id="roomId"
+          name="roomId"
+          defaultValue={defaultRoomId ?? rooms[0]?.id ?? ''}
+          required
+          className="mt-1"
+        >
+          {rooms.map((room) => (
+            <option key={room.id} value={room.id}>
+              {room.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
           name="description"
           id="description"
           rows={3}
-          className="mt-1 block w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+          className="mt-1"
         />
       </div>
 
       <div>
-        <label htmlFor="expiryDate" className="block text-sm font-medium text-[var(--foreground)]">Expiry Date</label>
-        <input
+        <Label htmlFor="expiryDate">Expiry Date</Label>
+        <Input
           type="date"
           name="expiryDate"
           id="expiryDate"
-          className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+          className="mt-1"
         />
       </div>
 
       {state.error && (
-        <div className="rounded-md border border-red-300 bg-red-100 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">{state.error}</div>
+        <Alert variant="destructive">{state.error}</Alert>
       )}
 
       <div className="pt-4">

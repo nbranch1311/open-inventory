@@ -8,7 +8,7 @@ export default function Home() {
           Open Inventory
         </h1>
         <p className="mt-6 text-lg leading-8 text-gray-600">
-          Manage your household inventory with ease. Open source and simple to use.
+          Manage your Inventory Space with ease. Open source and simple to use.
         </p>
         <div className="mt-10 flex items-center justify-center gap-x-6">
           <Link

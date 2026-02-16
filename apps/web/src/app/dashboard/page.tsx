@@ -1,17 +1,13 @@
 import { getUserHouseholds } from '@/actions/household'
 import {
-  getCategoriesForHousehold,
-  getLocationsForHousehold,
+  type InventorySortBy,
   searchInventoryItems,
 } from '@/actions/inventory'
+import { getRoomsForHousehold } from '@/actions/rooms'
 import { getUpcomingReminders } from '@/actions/reminders'
-import { DashboardSearchControls } from '@/components/inventory/DashboardSearchControls'
-import { InventoryEmptyState } from '@/components/inventory/InventoryEmptyState'
-import { InventoryNoResultsState } from '@/components/inventory/InventoryNoResultsState'
+import { RoomDashboardSurface } from '@/components/inventory/RoomDashboardSurface'
 import { UpcomingRemindersSection } from '@/components/reminders/UpcomingRemindersSection'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Suspense } from 'react'
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
@@ -26,26 +22,32 @@ export default async function DashboardPage({
     redirect('/onboarding')
   }
 
-  const selectedHousehold = households[0]
   const params = await searchParams
+  const selectedSpaceIdFromUrl = typeof params?.space === 'string' ? params.space : null
+  const selectedHousehold =
+    households.find((household) => household.id === selectedSpaceIdFromUrl) ?? households[0]
+  if (!selectedHousehold) {
+    redirect('/onboarding')
+  }
 
   const q = typeof params?.q === 'string' ? params.q : undefined
-  const categoryId = typeof params?.category === 'string' ? params.category : undefined
-  const locationId = typeof params?.location === 'string' ? params.location : undefined
-  const sortBy =
+  const sortBy: InventorySortBy =
     typeof params?.sort === 'string' &&
     (params.sort === 'recent' || params.sort === 'name' || params.sort === 'expiration')
       ? params.sort
       : 'recent'
+  const selectedRoomIdFromUrl = typeof params?.room === 'string' ? params.room : null
 
-  const hasSearchParams = Boolean(
-    q || categoryId || locationId || (typeof params?.sort === 'string' && params.sort !== 'recent'),
-  )
+  const [roomsResult, remindersRes] = await Promise.all([
+    getRoomsForHousehold(selectedHousehold.id),
+    getUpcomingReminders(selectedHousehold.id, 10),
+  ])
+  const selectedSpaceRooms = roomsResult.data ?? []
+  const selectedRoom =
+    selectedSpaceRooms.find((room) => room.id === selectedRoomIdFromUrl) ?? selectedSpaceRooms[0] ?? null
 
-  const { data: items, error } = await searchInventoryItems(selectedHousehold.id, {
+  const { data: roomItems, error } = await searchInventoryItems(selectedHousehold.id, {
     keyword: q,
-    categoryId,
-    locationId,
     sortBy,
     sortOrder:
       sortBy === 'name'
@@ -55,14 +57,22 @@ export default async function DashboardPage({
           : 'desc',
   })
 
-  const [categoriesRes, locationsRes, remindersRes] = await Promise.all([
-    getCategoriesForHousehold(selectedHousehold.id),
-    getLocationsForHousehold(selectedHousehold.id),
-    getUpcomingReminders(selectedHousehold.id, 10),
-  ])
+  const allRoomsBySpace = await Promise.all(
+    households.map(async (household) => {
+      const result = await getRoomsForHousehold(household.id)
+      return {
+        spaceId: household.id,
+        spaceName: household.name,
+        rooms: (result.data ?? []).map((room) => ({ id: room.id, name: room.name })),
+      }
+    }),
+  )
 
-  const categories = categoriesRes.data ?? []
-  const locations = locationsRes.data ?? []
+  const selectedRoomItems =
+    selectedRoom && roomItems
+      ? roomItems.filter((item) => item.room_id === selectedRoom.id)
+      : []
+
   const upcomingReminders = remindersRes.error ? [] : (remindersRes.data ?? [])
   const remindersError = remindersRes.error
 
@@ -74,27 +84,11 @@ export default async function DashboardPage({
     )
   }
 
-  const isEmpty = !items || items.length === 0
-  const showNoResultsState = isEmpty && hasSearchParams
-
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold">{selectedHousehold.name} Inventory</h1>
-        <Link
-          href="/dashboard/add"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--primary)] px-4 py-2 text-[var(--primary-foreground)] transition-colors hover:brightness-110"
-        >
-          Add Item
-        </Link>
       </div>
-
-      <Suspense fallback={null}>
-        <DashboardSearchControls
-          categories={categories}
-          locations={locations}
-        />
-      </Suspense>
 
       <div className="mb-6">
         {remindersError ? (
@@ -111,39 +105,20 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {showNoResultsState ? (
-        <InventoryNoResultsState />
-      ) : isEmpty ? (
-        <InventoryEmptyState />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items?.map((item) => (
-            <Link
-              key={item.id}
-              href={`/dashboard/${item.id}?household=${selectedHousehold.id}`}
-              className="block rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 transition-shadow hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--card-foreground)]">{item.name}</h3>
-                  <p className="text-[var(--muted-foreground)]">
-                    {item.quantity} {item.unit}
-                  </p>
-                </div>
-                {item.expiry_date && (
-                  <span className={`rounded-full px-2 py-1 text-xs ${
-                    new Date(item.expiry_date) < new Date() 
-                      ? 'bg-red-100 text-red-800' 
-                      : 'bg-green-100 text-green-800'
-                  }`}>
-                    {new Date(item.expiry_date).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+      <RoomDashboardSurface
+        households={households.map((household) => ({
+          id: household.id,
+          name: household.name,
+          role: household.role ?? null,
+        }))}
+        selectedHouseholdId={selectedHousehold.id}
+        selectedRoomId={selectedRoom?.id ?? null}
+        rooms={selectedSpaceRooms}
+        items={selectedRoomItems}
+        roomSearch={q ?? ''}
+        roomSort={sortBy}
+        destinationRooms={allRoomsBySpace}
+      />
     </div>
   )
 }

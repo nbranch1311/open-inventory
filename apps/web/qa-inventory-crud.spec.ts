@@ -15,7 +15,7 @@ function buildQaUser(prefix: string): QaUser {
 
 async function signupAndCreateHousehold(page: import('@playwright/test').Page, prefix: string) {
   const user = buildQaUser(prefix)
-  const householdName = `QA Household ${Date.now()}`
+  const inventorySpaceName = `QA Inventory Space ${Date.now()}`
 
   await page.goto('/signup')
   await page.getByLabel('Email').fill(user.email)
@@ -29,8 +29,8 @@ async function signupAndCreateHousehold(page: import('@playwright/test').Page, p
   }
 
   await expect(page).toHaveURL(/\/onboarding$/)
-  await page.getByLabel('Household Name').fill(householdName)
-  await page.getByRole('button', { name: 'Create Household' }).click()
+  await page.getByLabel('Inventory Space Name').fill(inventorySpaceName)
+  await page.getByRole('button', { name: 'Create Inventory Space' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
 }
 

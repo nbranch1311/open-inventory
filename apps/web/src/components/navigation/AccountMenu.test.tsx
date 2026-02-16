@@ -38,6 +38,8 @@ describe('AccountMenu', () => {
 
     expect(screen.getAllByText('Account')[0]).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Dashboard' })[1]).toHaveAttribute('href', '/dashboard')
+    expect(screen.queryByRole('link', { name: 'Add Item' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Inventory Space' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Sign out' }).length).toBeGreaterThan(0)
   })
 })

@@ -47,6 +47,20 @@ describe('updateSession', () => {
     expect(response.headers.get('location')).toBe(`${BASE_URL}/login`)
   })
 
+  it('redirects unauthenticated /settings requests to /login', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } })
+    mockCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: mockGetUser,
+      },
+    })
+
+    const response = await updateSession(buildRequest('/settings/inventory-space'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe(`${BASE_URL}/login`)
+  })
+
   it('does not redirect unprotected routes when unauthenticated', async () => {
     mockGetUser.mockResolvedValue({ data: { user: null } })
     mockCreateServerClient.mockReturnValue({

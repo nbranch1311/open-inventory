@@ -78,9 +78,9 @@ test.describe('T-004.8-API P0 auth matrix', () => {
     }
     await expect(page).toHaveURL(/\/onboarding$/)
 
-    const householdName = `QA Household ${Date.now()}`
-    await page.getByLabel('Household Name').fill(householdName)
-    await page.getByRole('button', { name: 'Create Household' }).click()
+    const inventorySpaceName = `QA Inventory Space ${Date.now()}`
+    await page.getByLabel('Inventory Space Name').fill(inventorySpaceName)
+    await page.getByRole('button', { name: 'Create Inventory Space' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.getByRole('heading', { level: 1, name: /inventory/i })).toBeVisible()
 

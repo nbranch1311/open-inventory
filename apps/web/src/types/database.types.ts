@@ -115,6 +115,7 @@ export type Database = {
           name: string
           purchase_date: string | null
           quantity: number
+          room_id: string
           status: string | null
           unit: string | null
           updated_at: string
@@ -130,6 +131,7 @@ export type Database = {
           name: string
           purchase_date?: string | null
           quantity?: number
+          room_id: string
           status?: string | null
           unit?: string | null
           updated_at?: string
@@ -145,6 +147,7 @@ export type Database = {
           name?: string
           purchase_date?: string | null
           quantity?: number
+          room_id?: string
           status?: string | null
           unit?: string | null
           updated_at?: string
@@ -169,6 +172,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -330,6 +340,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      rooms: {
+        Row: {
+          created_at: string
+          household_id: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          household_id: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          household_id?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

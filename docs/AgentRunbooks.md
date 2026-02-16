@@ -15,6 +15,7 @@ Use it as the execution standard across planning, build, testing, and release.
 - Any auth/security/schema/infra change requires approval gates.
 - Any major UI implementation requires product owner design alignment before execution.
 - Prefer `shadcn/ui` component patterns for web UI work unless explicitly overridden.
+- If a pre-AI usability gate is active in `TaskBacklog.md`, AI implementation tasks remain blocked until that gate receives Project Reviewer GO.
 
 ### Subagent Model Selection Policy
 
@@ -346,6 +347,7 @@ Implement clear, reliable user interfaces for core MVP flows.
 5. Implement and maintain consistent light/dark theme behavior across new and updated screens.
 6. Use `shadcn/ui` components/patterns for core form and layout primitives unless a documented exception exists.
 7. Add/update component tests for high-risk interactions.
+8. For dashboard IA work, follow room-centric interaction contracts (in-room add/search/sort, per-space edit mode, and policy-aligned destructive warnings).
 
 ### Must Not
 
@@ -403,6 +405,7 @@ Audit work at key milestones to ensure completeness, quality, and readiness to p
 | Infra/deploy changes    | DevOps + Human                  |
 | AI action scope changes | AI/LLM + Security + Human       |
 | MVP scope changes       | Architecture + Human            |
+| Pre-AI usability gate transitions | Project Reviewer + Human |
 | Phase Transitions       | Project Reviewer + Human        |
 
 ---
@@ -456,7 +459,8 @@ Next Handoff:
 4. **Project Reviewer Agent: Audit foundation phase (ADR, Schema, RLS) and verify environment readiness.**
 5. Backend Agent: implement core flows.
 6. UI Frontend Engineer Agent: implement core user interfaces on approved contracts.
-7. AI/LLM Agent: integrate grounded query and suggestions.
-8. QA Agent: verify all core acceptance criteria.
-9. DevOps Agent: release with observability and rollback readiness.
-10. UX Agent: iterate based on real usage feedback.
+7. If owner prioritizes non-AI usability expansion, complete the pre-AI usability gate (`ADR` -> API/Data/Security -> UI/UX -> QA/Reviewer).
+8. AI/LLM Agent: integrate grounded query and suggestions after gate GO.
+9. QA Agent: verify all core acceptance criteria.
+10. DevOps Agent: release with observability and rollback readiness.
+11. UX Agent: iterate based on real usage feedback.

@@ -6,6 +6,15 @@ If a requirement is missing, treat it as out of scope for MVP until added to thi
 
 ---
 
+## Terminology
+
+- User-facing label: **Inventory Space**
+- Data model/internal label: `Household`
+
+For MVP, these refer to the same concept (a user's primary inventory container). We keep `Household` internally to avoid risky schema churn while aligning UX copy to "Inventory Space."
+
+---
+
 ## 1) MVP Intent
 
 ### Product Goal
@@ -17,7 +26,7 @@ Help a single household user quickly know what they have at home, where it is, a
 The MVP is successful if a user can:
 
 1. Create an account and sign in.
-2. Create one household.
+2. Create one Inventory Space.
 3. Add/edit/remove inventory items with basic metadata.
 4. Upload item-related files/images.
 5. Search inventory with filters and natural language.
@@ -31,7 +40,8 @@ The MVP is successful if a user can:
 ### In Scope (MVP)
 
 - Authentication and user account.
-- Single-user household management.
+- Single-user inventory-space management (up to 5 spaces per user).
+- Room-based organization within each Inventory Space (up to 10 rooms per space).
 - Inventory CRUD.
 - Search/filter and AI-assisted query.
 - Document/image upload tied to items.
@@ -52,7 +62,7 @@ The MVP is successful if a user can:
 
 ### Current Assumptions
 
-- Primary user: one person managing one household.
+- Primary user: one person managing up to five Inventory Spaces.
 - Deployment target: web first, mobile-ready UX (native app can come later).
 - Data may include receipts/manuals/warranties.
 - AI should help decisions, not make irreversible actions.
@@ -67,10 +77,10 @@ The MVP is successful if a user can:
 
 ## 4) Core User Flows (Must Work End-to-End)
 
-### Flow A: Account + Household Setup
+### Flow A: Account + Inventory Space Setup
 
 1. User signs up and logs in.
-2. User creates a household profile.
+2. User creates an Inventory Space.
 3. User lands on empty inventory state with guided "Add first item."
 
 **Acceptance Criteria**
@@ -110,6 +120,22 @@ The MVP is successful if a user can:
 - Typical search response target: under 1 second for MVP data size.
 - Empty states explain next action (clear filters/add item).
 
+### Flow D2: Space + Room Organization and Item Movement
+
+1. User switches Inventory Spaces from dashboard tabs when multiple spaces exist.
+2. User creates/manages rooms inside a selected space.
+3. User adds items from a room surface (room is required).
+4. User moves one or many items across rooms/spaces.
+
+**Acceptance Criteria**
+
+- Dashboard space tabs render only when user has more than one Inventory Space.
+- Users can create up to 5 Inventory Spaces and up to 10 rooms per space.
+- Every item is assigned to exactly one room.
+- Move actions support single-item and bulk-item flows with clear confirmation.
+- Search/sort and add-item entry points are room-scoped in dashboard UX.
+- User can create additional Inventory Spaces from authenticated dashboard flow (not onboarding-only).
+
 ### Flow E: AI Question
 
 1. User asks natural language question, e.g. "Do I have batteries?"
@@ -140,7 +166,7 @@ The MVP is successful if a user can:
 
 - Email/password auth required.
 - Session handling with secure token/session storage.
-- Every data read/write must enforce household ownership boundary.
+- Every data read/write must enforce Inventory Space ownership boundary.
 - Redirect behavior must follow explicit state contract (`unauthenticated`, `authenticated_no_household`, `authenticated_with_household`, `expired_session`, `unconfirmed_email`).
 - Auth environment policy (email confirmation ON/OFF by environment) must be explicitly defined and documented.
 - User-facing auth error copy must follow documented error policy and avoid leaking internal diagnostics.
@@ -158,6 +184,24 @@ Each `InventoryItem` must support:
 - Optional notes
 - Optional condition/status
 - Optional usage frequency
+- Required room assignment (`room_id`) for item creation and persistence.
+
+### Inventory Spaces and Rooms
+
+- User can create up to 5 Inventory Spaces.
+- Each Inventory Space can contain up to 10 rooms.
+- Rooms are user-defined names and belong to one Inventory Space.
+- Items can be moved between rooms in the same space and across spaces.
+- Bulk move must be supported for moving multiple items in one action.
+- Deletion safety UX contract:
+  - Deleting a space that has rooms requires warning confirmation.
+  - Deleting a room that has items requires warning confirmation.
+  - Deleting an empty space or empty room can proceed without confirmation.
+- Dashboard UX contract:
+  - Top-level Inventory Space button is removed in favor of per-space edit mode.
+  - Top-level Add Item button is removed; add-item actions live within room surfaces.
+  - Search and sort controls are shown within each room surface.
+  - Space and room selection controls share one coordinated navigation row in dashboard.
 
 ### Documents and Images
 
@@ -187,6 +231,7 @@ Each `InventoryItem` must support:
 - `User`
 - `Household`
 - `HouseholdMember` (single-owner in MVP, but keeps model future-ready)
+- `Room`
 - `InventoryItem`
 - `ItemDocument`
 - `ItemReminder`
@@ -196,8 +241,11 @@ Each `InventoryItem` must support:
 
 ### Key Relationship Rules
 
-- A `User` owns one `Household` in MVP.
+- A `User` owns up to five `Household` records in MVP.
 - A `Household` owns many `InventoryItem` records.
+- A `Household` owns many `Room` records.
+- A `Room` belongs to one `Household`.
+- An `InventoryItem` belongs to one `Room` and one `Household`.
 - An `InventoryItem` can have many `ItemDocument` records.
 - An `InventoryItem` can have many `ItemReminder` records.
 - All queries must be household-scoped.
@@ -239,6 +287,16 @@ Each `InventoryItem` must support:
 - Use `shadcn/ui` components and patterns as the default UI foundation.
 - Use a `shadcn` auth template/pattern for login/signup as the baseline implementation direction.
 - Product owner design approval is required before major UI flow implementation or redesign.
+- Dashboard space switcher uses tabs only when more than one Inventory Space exists.
+- Inventory management controls are room-centric (add/search/sort in each room section).
+- Space and room edit actions are available from per-space edit mode, not a global top-nav control.
+- Dashboard control affordance standards:
+  - space edit uses icon button + tooltip,
+  - delete actions use trash icon button + tooltip,
+  - add room and add item use plus-icon affordances with explicit labels.
+- Item list card readability standard:
+  - item name and amount shown inline on primary row,
+  - expiration metadata shown on secondary row when present.
 - After auth is working, prioritize mobile-ready responsive behavior for all core MVP screens.
 - Add app-wide theme support (light and dark mode) before broad UI surface expansion.
 - Theme behavior should be consistent across auth and authenticated screens, with a user-accessible theme toggle.

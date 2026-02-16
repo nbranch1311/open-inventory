@@ -14,10 +14,12 @@ vi.mock('next/cache', () => ({
 }))
 
 import {
+  bulkMoveInventoryItems,
   createInventoryItem,
   deleteInventoryItem,
   getInventoryItems,
   getInventoryItem,
+  moveInventoryItem,
   searchInventoryItems,
   updateInventoryItem,
 } from './inventory'
@@ -39,11 +41,10 @@ const mockItem = {
   purchase_date: null,
   created_at: '2026-02-14T00:00:00.000Z',
   updated_at: '2026-02-14T00:00:00.000Z',
+  room_id: 'room-1',
 }
 
-function createSupabaseHarness(
-  resolveValue: { data?: unknown; error: unknown } = { error: null },
-) {
+function createSupabaseHarness(resolveValue: { data?: unknown; error: unknown } = { error: null }) {
   const chain: Record<string, unknown> = {}
   chain.select = vi.fn().mockImplementation(() => chain)
   chain.insert = vi.fn().mockImplementation(() => chain)
@@ -63,8 +64,44 @@ function createSupabaseHarness(
     return chain
   }
 
-  const from = vi.fn(() => chain)
-  const client = { from }
+  const roomSelectSingle = vi.fn(async () => ({
+    data: { id: 'room-1', household_id: HOUSEHOLD_ID },
+    error: null,
+  }))
+
+  const roomChain = {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        single: roomSelectSingle,
+      })),
+    })),
+  }
+
+  const householdMembersChain = {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          limit: vi.fn(async () => ({
+            data: [{ household_id: HOUSEHOLD_ID }],
+            error: null,
+          })),
+        })),
+      })),
+    })),
+  }
+
+  const from = vi.fn((table: string) => {
+    if (table === 'inventory_items') return chain
+    if (table === 'rooms') return roomChain
+    if (table === 'household_members') return householdMembersChain
+    throw new Error(`Unexpected table: ${table}`)
+  })
+  const client = {
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: { id: 'user-1' } } })),
+    },
+    from,
+  }
 
   return { client, from, chain }
 }
@@ -295,6 +332,18 @@ describe('createInventoryItem', () => {
     expect(result.error).toBe('Unit is required')
   })
 
+  it('returns error when room_id is missing', async () => {
+    mockCreateClient.mockResolvedValue(createSupabaseHarness().client)
+
+    const result = await createInventoryItem(HOUSEHOLD_ID, {
+      name: 'Item',
+      quantity: 1,
+      unit: 'pcs',
+    })
+
+    expect(result.error).toBe('Room is required')
+  })
+
   it('inserts item and revalidates on success', async () => {
     const harness = createSupabaseHarness()
     harness.chain.single.mockResolvedValue({ data: mockItem, error: null })
@@ -305,6 +354,7 @@ describe('createInventoryItem', () => {
       name: 'Test Item',
       quantity: 2,
       unit: 'pcs',
+      room_id: 'room-1',
     })
 
     expect(result.data).toEqual(mockItem)
@@ -315,6 +365,7 @@ describe('createInventoryItem', () => {
         quantity: 2,
         unit: 'pcs',
         household_id: HOUSEHOLD_ID,
+        room_id: 'room-1',
       }),
     )
     expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard')
@@ -386,6 +437,17 @@ describe('updateInventoryItem', () => {
     expect(result.data).toBeUndefined()
   })
 
+  it('returns error when room_id is empty string', async () => {
+    mockCreateClient.mockResolvedValue(createSupabaseHarness().client)
+
+    const result = await updateInventoryItem(HOUSEHOLD_ID, ITEM_ID, {
+      room_id: '',
+    })
+
+    expect(result.error).toBe('Room is required')
+    expect(result.data).toBeUndefined()
+  })
+
   it('returns error on DB failure', async () => {
     const harness = createSupabaseHarness()
     harness.chain.single.mockResolvedValue({
@@ -403,6 +465,122 @@ describe('updateInventoryItem', () => {
 
     expect(result.error).toBe('Failed to update inventory item')
     expect(result.data).toBeUndefined()
+  })
+})
+
+describe('moveInventoryItem', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns deterministic error when destination room is missing', async () => {
+    const authGetUser = vi.fn(async () => ({ data: { user: { id: 'user-1' } } }))
+    const roomSingle = vi.fn(async () => ({ data: null, error: { message: 'Not found' } }))
+    const from = vi.fn((table: string) => {
+      if (table === 'rooms') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: roomSingle,
+            })),
+          })),
+        }
+      }
+      if (table === 'household_members') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                limit: vi.fn(async () => ({ data: [{ household_id: HOUSEHOLD_ID }], error: null })),
+              })),
+            })),
+          })),
+        }
+      }
+
+      throw new Error(`Unexpected table: ${table}`)
+    })
+
+    mockCreateClient.mockResolvedValue({ auth: { getUser: authGetUser }, from })
+
+    const result = await moveInventoryItem(ITEM_ID, 'missing-room')
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Destination room not found',
+      errorCode: 'destination_room_not_found',
+    })
+  })
+})
+
+describe('bulkMoveInventoryItems', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns explicit per-item failures when any source item is missing', async () => {
+    const authGetUser = vi.fn(async () => ({ data: { user: { id: 'user-1' } } }))
+    const roomSingle = vi.fn(async () => ({
+      data: { id: 'dest-room', household_id: 'household-1' },
+      error: null,
+    }))
+    const itemsSelect = vi.fn(async () => ({
+      data: [{ id: 'item-1', household_id: 'household-1', room_id: 'room-a' }],
+      error: null,
+    }))
+    const membersSelect = vi.fn(async () => ({
+      data: [{ household_id: 'household-1' }],
+      error: null,
+    }))
+
+    const from = vi.fn((table: string) => {
+      if (table === 'rooms') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: roomSingle,
+            })),
+          })),
+        }
+      }
+
+      if (table === 'inventory_items') {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => itemsSelect()),
+          })),
+        }
+      }
+
+      if (table === 'household_members') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                limit: vi.fn(async () => ({ data: [{ household_id: 'household-1' }], error: null })),
+              })),
+              in: vi.fn(() => membersSelect()),
+            })),
+          })),
+        }
+      }
+
+      throw new Error(`Unexpected table: ${table}`)
+    })
+
+    mockCreateClient.mockResolvedValue({ auth: { getUser: authGetUser }, from })
+
+    const result = await bulkMoveInventoryItems(['item-1', 'item-2'], 'dest-room')
+
+    expect(result.success).toBe(false)
+    expect(result.errorCode).toBe('validation_failed')
+    expect(result.failures).toEqual([
+      {
+        itemId: 'item-2',
+        reason: 'item_not_found_or_forbidden',
+      },
+    ])
+    expect(result.movedItemIds).toEqual([])
   })
 })
 

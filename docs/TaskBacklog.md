@@ -4,6 +4,8 @@ This backlog translates `MvpAppSpec.md` and `AgentRunbooks.md` into execution-re
 
 Use this as the single queue for MVP delivery.
 
+Terminology note: use **Inventory Space** in user-facing copy. Internal model/task names may still reference `household` until a dedicated schema refactor is explicitly approved.
+
 ---
 
 ## Backlog Conventions
@@ -565,7 +567,7 @@ Environment policy:
   - Active filters are clearly visible and dismissible.
   - "No results" state is helpful.
 - **Completion Notes (2026-02-14):**
-  - `DashboardSearchControls`: debounced search input, category/location filters (graceful when empty), sort dropdown, Clear filters button.
+  - Historical implementation used `DashboardSearchControls` for debounced search, category/location filters (graceful when empty), sort dropdown, and Clear filters.
   - `InventoryNoResultsState` with Clear filters CTA.
   - URL search params drive server-side search; Suspense wraps controls for useSearchParams.
   - Review confirmation (2026-02-14): Project-Review-012 GO.
@@ -622,23 +624,404 @@ Environment policy:
 
 ---
 
+## 8.5) Option B: Minimal Inventory Space Management (Planning Slice)
+
+This is a **backlog-only planning pass**. No implementation is implied by this section.
+
+Scope is intentionally minimal and limited to:
+- Rename Inventory Space
+- Inventory Space settings surface
+- Delete Inventory Space (with strict safety constraints)
+
+### 8.5.1) Inventory Space Management API (Rename/Delete/Settings Read)
+
+- **Task ID:** `T-008.5-API`
+- **Owner Agent:** Backend Agent + Data Modeling Agent + Security/Privacy Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `M`
+- **Dependencies:** `T-008-API`, `T-004.8-API`
+- **Objective:** add the minimum backend contract for Inventory Space management without broad schema refactors.
+- **Deliverables:**
+  - Rename action for the current Inventory Space.
+  - Settings read action (current name, created date, member role for MVP owner path).
+  - Delete action with explicit guardrails:
+    - typed confirmation required (user must type the Inventory Space name)
+    - deny delete when items/documents/reminders exist
+    - clear UX-safe error contract for blocked delete
+  - Internal naming remains `household` for DB/RLS compatibility in this phase.
+- **Acceptance Criteria:**
+  - Rename persists and is reflected in dashboard/app shell.
+  - Delete is blocked safely when data exists; no partial deletes.
+  - Auth and ownership checks remain deterministic and household-scoped.
+- **Dispatch Note (2026-02-16):**
+  - Product Manager Orchestrator dispatched Option B execution.
+  - This task is the active execution step required before `T-008.5-UI`.
+- **Completion Evidence (2026-02-16):**
+  - Implemented backend actions for current inventory space settings read, owner-only rename, and owner-only delete with typed-confirmation and dependent-data guardrails.
+  - Added/updated action tests for rename + settings read + delete guardrails + ownership checks.
+  - Validation command: `pnpm --filter @open-inventory/web test src/actions/household.test.ts` -> `13 passed (13)`.
+
+---
+
+### 8.5.2) Inventory Space Settings UI (Rename/Delete Surface)
+
+- **Task ID:** `T-008.5-UI`
+- **Owner Agent:** UI Frontend Engineer Agent + UX/Product Research Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `M`
+- **Dependencies:** `T-008.5-API`, `T-005.8-UI`
+- **Objective:** provide a minimal settings experience that makes Inventory Space management explicit and understandable.
+- **Deliverables:**
+  - New Settings route/surface for Inventory Space management (`/settings/inventory-space` unless owner changes it).
+  - Rename form with loading/success/error states.
+  - Delete flow with typed confirmation and clear consequences copy.
+  - Mobile-ready and theme-consistent behavior (light/dark).
+- **Acceptance Criteria:**
+  - User can rename Inventory Space end-to-end from settings.
+  - User receives explicit blocked-delete reasons when data exists.
+  - No ambiguous/destructive one-click delete path exists.
+- **Completion Notes (2026-02-16):**
+  - Added new protected settings surface at `/settings/inventory-space` with current name, created date, and member role display.
+  - Implemented owner-only rename UX with loading, success, and error states wired to `renameCurrentInventorySpace`.
+  - Implemented typed-confirm delete flow with explicit consequence copy and backend blocked-delete reason rendering from `blockedBy`.
+  - Added navigation entry points to Inventory Space settings in desktop and mobile account navigation.
+  - Validation command: `pnpm --filter @open-inventory/web test src/components/settings/InventorySpaceSettingsForm.test.tsx src/components/navigation/AccountMenu.test.tsx src/actions/household.test.ts src/utils/supabase/middleware.test.ts` -> `25 passed (25)`.
+
+---
+
+### 8.5.3) Inventory Space Management Quality Gate
+
+- **Task ID:** `T-008.5-QA`
+- **Owner Agent:** Testing/QA Agent + Project Reviewer Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `S`
+- **Dependencies:** `T-008.5-API`, `T-008.5-UI`
+- **Objective:** verify Option B management behavior before AI scope starts.
+- **Deliverables:**
+  - Targeted QA coverage for rename success/error and delete safety constraints.
+  - Dedicated E2E coverage for Option B management flow (`qa-inventory-space-management.spec.ts` or equivalent).
+  - Reviewer GO/NO-GO report for Inventory Space management readiness.
+  - Backlog status updates and residual risk callouts.
+- **Acceptance Criteria:**
+  - Rename/delete/settings behavior is deterministic in web + mobile viewport checks.
+  - Reviewer verdict is explicit GO/NO-GO with blocking findings listed.
+  - If NO-GO, AI tasks remain blocked.
+- **Completion Notes (2026-02-16):**
+  - Added dedicated Option B management E2E spec: `apps/web/qa-inventory-space-management.spec.ts`.
+  - Added targeted UI test for document-specific blocked-delete reason in `InventorySpaceSettingsForm.test.tsx`.
+  - Deterministic evidence commands:
+    - `pnpm --filter @open-inventory/web test src/actions/household.test.ts src/components/settings/InventorySpaceSettingsForm.test.tsx` -> `17 passed (17)`.
+    - `CI= pnpm --filter @open-inventory/web exec playwright test qa-inventory-space-management.spec.ts --config playwright.config.ts` -> `2 passed`.
+  - Reviewer decision: **GO** for Option B management scope and AI gate readiness (`docs/Project-Review-014.md`).
+
+---
+
+## 8.6) AI Start Gate (Policy)
+
+`T-009-AI` and `T-009-UI` should not start until:
+- `T-008.5-QA` is **done**
+- Project Reviewer issues **GO** for Option B management scope
+- `T-008.10-QA` is **done**
+- Project Reviewer issues **GO** for the pre-AI usability expansion scope
+- Any blocking findings are resolved or explicitly accepted by owner
+
+---
+
+## 8.7) Pre-AI Usability Expansion: Spaces + Rooms + Dashboard IA
+
+This section captures owner-approved pre-AI usability expansion work.  
+Goal: make the app strongly usable without AI before `T-009-*` begins.
+
+### 8.7.1) Multi-Space + Room Architecture and Contract Lock
+
+- **Task ID:** `T-008.7-ADR`
+- **Owner Agent:** Architecture Agent + UX/Product Research Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `M`
+- **Dependencies:** `T-008.5-QA`
+- **Objective:** lock API/UI/data contracts for multi-space tabs, room model, move flows, and top-nav IA changes before implementation.
+- **Deliverables:**
+  - ADR for space/room boundaries and transition strategy from current household-first flows.
+  - UX interaction contract for:
+    - conditional dashboard tabs (render only if space count > 1),
+    - room-level add/search/sort placement,
+    - per-space edit mode replacing top-level Inventory Space button.
+  - Bulk-move interaction recommendation (single + multi-select move patterns).
+- **Acceptance Criteria:**
+  - Explicit decisions for max limits (5 spaces/user, 10 rooms/space).
+  - Explicit deletion warning policy:
+    - space with rooms -> warning confirmation,
+    - room with items -> warning confirmation,
+    - empty space/room -> no confirmation requirement.
+  - Product owner approves interaction contract before API/UI implementation.
+- **Dispatch Note (2026-02-16):**
+  - Pre-AI usability expansion initiated per owner reprioritization.
+  - `T-008.7-ADR` is now the active workstream gate before API/UI implementation.
+- **Completion Notes (2026-02-16):**
+  - Published architecture + UX contract ADR: `docs/ADR-002-PreAI-Usability-Spaces-Rooms-IA.md`.
+  - Locked decisions for conditional space tabs, max limits (5 spaces/user, 10 rooms/space), room-required placement, single/bulk move behavior across rooms/spaces, per-space edit mode, in-room add/search/sort placement, and deletion warning policy.
+  - Documented explicit in-scope/out-of-scope boundaries, migration strategy from current household-first flows, risks/mitigations, and ADR acceptance criteria.
+
+---
+
+### 8.7.2) Spaces + Rooms Backend/Data/Security Contract
+
+- **Task ID:** `T-008.8-API`
+- **Owner Agent:** Backend Agent + Data Modeling Agent + Security/Privacy Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `L`
+- **Dependencies:** `T-008.7-ADR`
+- **Objective:** implement backend and schema support for spaces/rooms constraints and item move operations.
+- **Deliverables:**
+  - Room CRUD actions scoped to Inventory Space ownership.
+  - Enforced limits:
+    - max 5 Inventory Spaces per user,
+    - max 10 rooms per space.
+  - Item placement/move contract:
+    - room required for item creation,
+    - item move across rooms and across spaces,
+    - bulk item move action with deterministic validation/errors.
+  - Delete policies aligned to UX contract and data safety expectations.
+- **Acceptance Criteria:**
+  - No cross-user/space data leakage.
+  - Limits enforced server-side.
+  - Move operations are deterministic and auditable.
+  - Security sign-off is explicit for new destructive/move paths.
+- **Completion Notes (2026-02-16):**
+  - Added room backend server actions with ownership-scoped room CRUD and delete-warning policy support:
+    - `getRoomsForHousehold`, `createRoom`, `renameRoom`, `deleteRoom` in `apps/web/src/actions/rooms.ts`.
+  - Enforced room-required item placement and added deterministic move contracts in `apps/web/src/actions/inventory.ts`:
+    - `createInventoryItem` now requires `room_id` and validates household ownership.
+    - Added `moveInventoryItem` for single-item room/space moves.
+    - Added `bulkMoveInventoryItems` with explicit per-item failure reporting and no silent partial behavior.
+  - Added max-space and max-room server enforcement pathing:
+    - `createHousehold` now maps deterministic max-space failure (`household_limit_reached`) in `apps/web/src/actions/household.ts`.
+    - DB migration enforces limits and room model constraints.
+  - Added migration `supabase/migrations/20260216191500_spaces_rooms_contract_enforcement.sql`:
+    - creates `rooms` table + RLS policies,
+    - adds `inventory_items.room_id` with backfill and NOT NULL,
+    - hardens item manage policy to enforce room-household consistency,
+    - enforces 10 rooms/space trigger,
+    - updates `create_household_with_owner` to enforce 5 spaces/user.
+  - Updated DB typings for `rooms` and `inventory_items.room_id` in `apps/web/src/types/database.types.ts`.
+  - Validation command:
+    - `pnpm --filter @open-inventory/web test src/actions/inventory.test.ts src/actions/rooms.test.ts src/actions/household.test.ts` -> `44 passed (44)`.
+- **Remediation Notes (2026-02-16):**
+  - Added selected-space APIs for per-space edit mode contract:
+    - `getInventorySpaceSettings(spaceId)`
+    - `renameInventorySpace(spaceId, name)`
+    - `deleteInventorySpace(spaceId, opts)`
+  - Aligned selected-space delete semantics to ADR:
+    - non-empty space (has rooms) -> `warning_required` with deterministic warning payload `{ hasRooms, roomCount }`
+    - empty space -> delete allowed without typed-name confirmation
+  - Hardened 5-space/user limit at database table layer with membership trigger enforcement (not RPC-only).
+  - Made room deletion deterministic: `deleteRoom` now returns `room_not_found` when no rows are deleted.
+  - Remediation verification commands:
+    - `pnpm --filter @open-inventory/web test src/actions/household.test.ts src/actions/rooms.test.ts` -> `24 passed (24)`.
+    - `pnpm --filter @open-inventory/web test src/actions/inventory.test.ts` -> `26 passed (26)`.
+
+---
+
+### 8.7.3) Dashboard + Room-Centric UI Refresh (No AI)
+
+- **Task ID:** `T-008.9-UI`
+- **Owner Agent:** UI Frontend Engineer Agent + UX/Product Research Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `L`
+- **Dependencies:** `T-008.8-API`, `T-005.8-UI`
+- **Objective:** deliver room-centric dashboard UX and remove top-level controls per owner direction.
+- **Deliverables:**
+  - Dashboard Inventory Space tabs (hidden when only one space exists).
+  - Room management UI per space (create/rename/delete room with policy-compliant warnings).
+  - Item creation entry inside room surfaces (remove top-level Add Item button).
+  - Search and sort controls inside each room surface.
+  - Per-space edit mode for rename/delete space and room management (remove top-level Inventory Space button).
+  - Bulk-select and move UX for items across rooms/spaces.
+- **Acceptance Criteria:**
+  - Core workflows are usable without AI assistance.
+  - Mobile and theme behavior remain consistent.
+  - `shadcn/ui` patterns are used by default; exceptions are documented owner-visible.
+- **Completion Notes (2026-02-16):**
+  - Implemented selected Inventory Space dashboard tabs with conditional rendering (tabs render only when user has more than one space).
+  - Reworked dashboard to selected-space and selected-room context:
+    - room-scoped add/search/sort controls,
+    - selected room item surface,
+    - selected-space-driven room and item visibility.
+  - Added selected-space edit mode in dashboard:
+    - rename via `renameInventorySpace(spaceId, name)`,
+    - delete via `deleteInventorySpace(spaceId, opts)` with ADR warning flow for non-empty spaces.
+  - Added room management UI per selected space:
+    - create room,
+    - rename room,
+    - delete room with warning confirmation when non-empty.
+  - Added bulk move UX:
+    - multi-select items,
+    - destination room selection across spaces,
+    - deterministic per-item failure feedback in UI.
+  - Removed top-level app nav controls:
+    - global `Add Item` button removed from account nav,
+    - global `Inventory Space` button removed from account nav.
+  - Room-required add-item flow updated:
+    - add-item route now requires/validates room selection within selected space.
+  - Validation evidence:
+    - `pnpm --filter @open-inventory/web test src/app/dashboard/page.test.tsx src/components/inventory/RoomDashboardSurface.test.tsx src/components/navigation/AccountMenu.test.tsx src/actions/rooms.test.ts src/actions/inventory.test.ts` -> `40 passed (40)`.
+    - `pnpm --filter @open-inventory/web test src/components/inventory/RoomDashboardSurface.test.tsx src/components/navigation/AccountMenu.test.tsx src/actions/rooms.test.ts src/actions/inventory.test.ts` -> `45 passed (45)`.
+  - `shadcn/ui` consistency note:
+    - defaulted to project `shadcn` primitives (`Button`, `Input`, `Select`, `Alert`) for new dashboard flows.
+    - Exception: native checkbox input used for bulk multi-select because no project `Checkbox` primitive exists yet; behavior/theme verified and kept scoped to T-008.9.
+- **Post-Review Follow-Up (2026-02-16):**
+  - Owner identified UX/IA gaps requiring a focused polish pass before AI phase:
+    - no clear in-dashboard path to create an additional Inventory Space after onboarding,
+    - space/room navigation and room action affordances need redesign for clarity and efficiency.
+
+---
+
+### 8.7.3a) Dashboard UX/IA Polish + Space Creation Recovery
+
+- **Task ID:** `T-008.9a-UI`
+- **Owner Agent:** UI Frontend Engineer Agent + UX/Product Research Agent + Architecture Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `M`
+- **Dependencies:** `T-008.9-UI`
+- **Objective:** resolve owner-identified usability issues in dashboard information architecture and controls before AI phase starts.
+- **Deliverables:**
+  - Add explicit in-dashboard path to create a new Inventory Space (post-onboarding), respecting max 5 limit and error states.
+  - Replace separated space/room sections with a single-line coordinated navigation pattern:
+    - Space selector control
+    - Room selector control scoped to selected space
+  - Preferred implementation direction: `shadcn/ui` Navigation Menu or equivalent shadcn-first pattern approved by Architecture + UX.
+  - Icon-first control updates with tooltips:
+    - space edit control -> icon button + tooltip,
+    - room delete -> trash icon button + tooltip,
+    - add room -> "Add Room" with plus icon,
+    - add item in room -> "Add Item" with plus icon.
+  - Room row/action affordance cleanup:
+    - remove ambiguous room-selection button behavior,
+    - keep room actions visually proximate to room identity.
+  - Item card layout refinement:
+    - item name and amount inline,
+    - expiration date on secondary line when present.
+- **Acceptance Criteria:**
+  - User can create additional spaces from dashboard without relying on onboarding-only entry.
+  - Space and room controls are on one coordinated row and update deterministically on selection changes.
+  - Icon controls include tooltip labels and remain keyboard-accessible.
+  - Owner validates revised dashboard UX direction.
+- **Subphase Update (2026-02-16, UI contract lock complete):**
+  - Published architecture/UX decision lock: `docs/ADR-003-T0089a-Dashboard-UX-IA-Contract-Lock.md`.
+  - Locked same-line selector pattern as shadcn-first coordinated row (`Select` + `Select` + right-aligned actions); `NavigationMenu` not selected for this interaction.
+  - Locked accessibility contract for icon-only controls + tooltips (required `aria-label`, keyboard focus behavior, tooltip as supplementary label only).
+  - Locked dashboard `New Space` entry placement and deterministic limit/error contract (max 5 spaces, stable state on failure).
+  - Locked room row and item row interaction contract (room identity primary target, proximate row actions, item name+amount inline with expiration on secondary line).
+  - Task is now ready for implementation subphase; status remains `in_progress` until UI build + QA evidence complete.
+- **Completion Notes (2026-02-16, owner-approved refinement pass):**
+  - Owner approval explicitly granted for polished dashboard UX and pre-AI progression.
+  - Refined room-surface actions:
+    - moved `Add Item` into selected room section,
+    - room rename now uses icon control (`Edit Room`) with tooltip,
+    - room delete action moved into room edit mode with trash icon + tooltip,
+    - `Add Item` hidden while room edit mode is active.
+  - Updated bulk move controls to coordinated destination selectors (`Move destination space` + `Move destination room`) to match space/room selection pattern.
+  - Added `Back` action in item edit form (`ItemDetailForm`) to return to dashboard scoped to current inventory space.
+  - Removed unused `DashboardSearchControls` implementation and test file.
+  - Validation evidence:
+    - `pnpm --filter @open-inventory/web test src/components/inventory/RoomDashboardSurface.test.tsx src/app/dashboard/page.test.tsx` -> `2 passed (2)`, `9 passed (9)`.
+    - `CI='' pnpm --filter @open-inventory/web exec playwright test qa-inventory-space-management.spec.ts --config playwright.config.ts` -> `2 passed (2)`.
+  - Reviewer verdict: **GO** for pre-AI handoff; `T-008.9a-UI` closure approved.
+
+---
+
+### 8.7.4) Pre-AI Usability Quality + Reviewer Gate
+
+- **Task ID:** `T-008.10-QA`
+- **Owner Agent:** Testing/QA Agent + Project Reviewer Agent
+- **Priority:** `P0`
+- **Status:** `done`
+- **Effort:** `M`
+- **Dependencies:** `T-008.8-API`, `T-008.9a-UI`
+- **Objective:** validate non-AI usability baseline and decide readiness to start AI phase.
+- **Deliverables:**
+  - QA matrix for tabs/rooms/move/delete policies (desktop + mobile).
+  - Dedicated E2E coverage for room-centric dashboard and bulk move behavior.
+  - Reviewer GO/NO-GO report for pre-AI usability baseline.
+- **Acceptance Criteria:**
+  - Room-required item creation is enforced and validated.
+  - Space/room limits and deletion warning policies behave deterministically.
+  - Reviewer verdict is explicit with blockers listed.
+  - If NO-GO, `T-009-AI` and `T-009-UI` remain blocked.
+- **Gate Re-run Evidence (2026-02-16, T-008.10 remediation pass):**
+  - `pnpm --filter @open-inventory/web exec playwright test qa-inventory-space-management.spec.ts`
+    - Result: `failed` at runner bootstrap (`http://localhost:3000` already in use).
+  - `CI='' pnpm --filter @open-inventory/web exec playwright test qa-inventory-space-management.spec.ts`
+    - Result: `1 failed, 1 passed`.
+    - Blocker: desktop gate case now fails later at stale-item bulk-move selection (`getByLabel('Select <stale item>')` timeout at `qa-inventory-space-management.spec.ts:189`).
+  - `pnpm --filter @open-inventory/web test src/components/inventory/RoomDashboardSurface.test.tsx src/app/dashboard/page.test.tsx`
+    - Result: `2 passed (2)`, `5 passed (5)`.
+  - Reviewer verdict remains **NO-GO** (see `docs/Project-Review-017.md`).
+- **Completion Notes (2026-02-16, stale-item flake remediation):**
+  - Hardened stale-item selection step in `apps/web/qa-inventory-space-management.spec.ts`:
+    - after clearing search input, assert input value is empty,
+    - assert URL search param `q` is absent before proceeding,
+    - assert stale-item checkbox is visible before `check()`.
+  - Verification commands:
+    - `CI='' pnpm --filter @open-inventory/web exec playwright test qa-inventory-space-management.spec.ts --config playwright.config.ts` -> `2 passed (2)`.
+    - `pnpm --filter @open-inventory/web test src/components/inventory/RoomDashboardSurface.test.tsx src/app/dashboard/page.test.tsx` -> `2 passed (2)`, `5 passed (5)`.
+  - Reviewer verdict: **GO** for `T-008.10-QA` closure (`docs/Project-Review-018.md`).
+- **Reopen Note (2026-02-16):**
+  - Gate reopened due owner-reported P0 usability gaps discovered post-review.
+  - `T-008.10-QA` now depends on `T-008.9a-UI` completion and fresh reviewer GO.
+- **Reopened Validation Evidence (2026-02-16, post T-008.9a contract alignment):**
+  - Updated dedicated E2E coverage in `apps/web/qa-inventory-space-management.spec.ts` for:
+    - in-dashboard `New Space` creation after onboarding,
+    - same-line space/room coordinated controls,
+    - icon + tooltip keyboard-focus assertions (`Edit selected space`, `Delete room`),
+    - warning flows for non-empty room and non-empty space,
+    - item card layout intent (name+amount primary, expiry secondary),
+    - room-required add-item flow for space with no rooms.
+  - Verification commands:
+    - `pnpm --filter @open-inventory/web test src/app/dashboard/page.test.tsx src/components/inventory/RoomDashboardSurface.test.tsx` -> `Test Files 2 passed (2)`, `Tests 8 passed (8)`.
+    - `CI='' pnpm --filter @open-inventory/web exec playwright test qa-inventory-space-management.spec.ts --config playwright.config.ts` -> `2 passed (2)`.
+  - Reviewer verdict: **GO** for `T-008.10-QA` (see `docs/Project-Review-020.md`).
+
+---
+
 ## 9) Implement Grounded AI Query + Suggestions
 
 - **Task ID:** `T-009-AI`
-- **Owner Agent:** AI/LLM Agent
+- **Owner Agent:** AI/LLM Agent + Testing/QA Agent + Security/Privacy Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `in_progress`
 - **Effort:** `L`
-- **Dependencies:** `T-005-API`, `T-007-API`, `T-003`
+- **Dependencies:** `T-005-API`, `T-007-API`, `T-003`, `T-008.5-QA`, `T-008.9a-UI`, `T-008.10-QA`
 - **Objective:** deliver safe AI responses for inventory questions and suggestions.
 - **Deliverables:**
   - Prompt contract with grounding rules.
   - Query orchestration that uses household-scoped data only.
   - Confidence and uncertainty behavior.
+  - QA test plan and execution evidence for grounded-answer behavior, uncertainty handling, and guardrail/refusal paths.
+  - Reviewer GO/NO-GO report for AI readiness to progress.
 - **Acceptance Criteria:**
   - AI answers include evidence references.
   - Unsupported/uncertain questions handled safely.
   - No unapproved write actions executed.
+  - QA verifies deterministic behavior for core AI scenarios and key failure/refusal paths.
+  - Project Reviewer issues explicit GO before `T-009-AI` is considered complete.
+- **Gate Update (2026-02-16):**
+  - Option B gate prerequisites are satisfied (`T-008.5-QA` done + Reviewer GO in `docs/Project-Review-014.md`).
+  - Pre-AI usability gate was reopened after owner-reported P0 dashboard UX gaps.
+  - `T-009-AI` remains blocked until `T-008.9a-UI` and refreshed `T-008.10-QA` reviewer GO are complete.
+- **Gate Update (2026-02-16, reviewer refresh):**
+  - Refreshed `T-008.10-QA` reviewer verdict is now **GO** (`docs/Project-Review-020.md`).
+  - `T-008.9a-UI` closure and owner approval are now complete; dependency chain is satisfied.
+- **Kickoff Update (2026-02-16):**
+  - Reviewer pass returned **GO** for AI phase start.
+  - `T-009-AI` is now active with required QA + Security co-ownership.
 
 ---
 
@@ -647,7 +1030,7 @@ Environment policy:
 - **Task ID:** `T-009-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `blocked`
 - **Effort:** `M`
 - **Dependencies:** `T-009-AI`, `T-005.8-UI`
 - **Objective:** chat-like interface for "Ask my inventory".
@@ -659,6 +1042,9 @@ Environment policy:
   - Streaming response support (if backend supports it) or loading state.
   - Citations are clickable and open item details.
   - Clear distinction between AI suggestion and fact.
+- **Gate Update (2026-02-16):**
+  - Option B gate is satisfied, but owner-prioritized pre-AI usability work is now active.
+  - This task remains blocked until `T-009-AI` completes with QA evidence and reviewer GO.
 
 ---
 
@@ -695,8 +1081,10 @@ Environment policy:
    - `T-006-API` -> `T-006-UI`
    - `T-007-API` -> `T-007-UI`
    - `T-008-API` -> `T-008-UI`
-9. `T-009-AI` -> `T-009-UI`
-10. `T-010` closes MVP readiness
+9. `T-008.5-API` -> `T-008.5-UI` -> `T-008.5-QA` (Option B management gate)
+10. `T-008.7-ADR` -> `T-008.8-API` -> `T-008.9-UI` -> `T-008.9a-UI` -> `T-008.10-QA` (pre-AI usability gate)
+11. `T-009-AI` -> `T-009-UI`
+12. `T-010` closes MVP readiness
 
 ---
 

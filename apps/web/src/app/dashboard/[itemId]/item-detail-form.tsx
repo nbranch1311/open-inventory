@@ -1,11 +1,18 @@
 'use client'
 
+import Link from 'next/link'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
+import { ArrowLeft } from 'lucide-react'
 import type { ItemDocument } from '@/actions/ItemDocuments'
 import type { ItemReminder } from '@/actions/reminders'
 import { ItemDocumentsSection } from '@/components/documents/ItemDocumentsSection'
 import { ItemRemindersSection } from '@/components/reminders/ItemRemindersSection'
+import { Alert } from '@/components/ui/Alert'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/Label'
+import { Textarea } from '@/components/ui/Textarea'
 
 type ItemFormState = {
   error: string | null
@@ -37,13 +44,13 @@ function SaveButton() {
   const { pending } = useFormStatus()
 
   return (
-    <button
+    <Button
       type="submit"
       disabled={pending}
-      className="flex min-h-11 w-full justify-center rounded-md border border-transparent bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] shadow-sm hover:brightness-110 disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
+      className="w-full"
     >
       {pending ? 'Saving...' : 'Save Changes'}
-    </button>
+    </Button>
   )
 }
 
@@ -51,13 +58,13 @@ function DeleteButton() {
   const { pending } = useFormStatus()
 
   return (
-    <button
+    <Button
       type="submit"
       disabled={pending}
-      className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--destructive)] px-4 py-2 text-[var(--destructive-foreground)] transition-colors hover:brightness-110 disabled:opacity-70"
+      variant="destructive"
     >
       {pending ? 'Deleting...' : 'Delete Item'}
-    </button>
+    </Button>
   )
 }
 
@@ -67,6 +74,14 @@ export function ItemDetailForm({ item, documents, reminders, updateAction, delet
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mb-4">
+        <Button asChild variant="outline">
+          <Link href={`/dashboard?space=${item.household_id}`}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back
+          </Link>
+        </Button>
+      </div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Edit Item</h1>
         <form action={deleteFormAction}>
@@ -75,57 +90,59 @@ export function ItemDetailForm({ item, documents, reminders, updateAction, delet
       </div>
 
       {deleteState.error && (
-        <div className="mb-4 rounded-md border border-red-300 bg-red-100 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">{deleteState.error}</div>
+        <Alert variant="destructive" className="mb-4">
+          {deleteState.error}
+        </Alert>
       )}
 
       <form action={updateFormAction} className="space-y-4">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-[var(--foreground)]">Name</label>
-          <input
+          <Label htmlFor="name">Name</Label>
+          <Input
             type="text"
             name="name"
             id="name"
             defaultValue={item.name}
             required
-            className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+            className="mt-1"
           />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="quantity" className="block text-sm font-medium text-[var(--foreground)]">Quantity</label>
-            <input
+            <Label htmlFor="quantity">Quantity</Label>
+            <Input
               type="number"
               name="quantity"
               id="quantity"
               defaultValue={item.quantity}
               required
               step="0.01"
-              className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+              className="mt-1"
             />
           </div>
           <div>
-            <label htmlFor="unit" className="block text-sm font-medium text-[var(--foreground)]">Unit</label>
-            <input
+            <Label htmlFor="unit">Unit</Label>
+            <Input
               type="text"
               name="unit"
               id="unit"
               defaultValue={item.unit ?? ''}
               required
-              className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+              className="mt-1"
               placeholder="pcs, kg, l"
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-[var(--foreground)]">Description</label>
-          <textarea
+          <Label htmlFor="description">Description</Label>
+          <Textarea
             name="description"
             id="description"
             rows={3}
             defaultValue={item.description ?? ''}
-            className="mt-1 block w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+            className="mt-1"
           />
         </div>
 
@@ -142,18 +159,18 @@ export function ItemDetailForm({ item, documents, reminders, updateAction, delet
         />
 
         <div>
-          <label htmlFor="expiryDate" className="block text-sm font-medium text-[var(--foreground)]">Expiry Date</label>
-          <input
+          <Label htmlFor="expiryDate">Expiry Date</Label>
+          <Input
             type="date"
             name="expiryDate"
             id="expiryDate"
             defaultValue={item.expiry_date ? new Date(item.expiry_date).toISOString().split('T')[0] : ''}
-            className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:ring-[var(--primary)] sm:text-sm"
+            className="mt-1"
           />
         </div>
 
         {updateState.error && (
-          <div className="rounded-md border border-red-300 bg-red-100 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">{updateState.error}</div>
+          <Alert variant="destructive">{updateState.error}</Alert>
         )}
 
         <div className="pt-4">

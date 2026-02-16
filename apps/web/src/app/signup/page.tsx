@@ -30,7 +30,7 @@ export default function SignupPage() {
     <AuthForm
       mode="signup"
       title="Create your account"
-      description="Start organizing your household inventory."
+      description="Start organizing your Inventory Space."
       submitLabel="Sign up"
       switchHref="/login"
       switchLabel="Already have an account? Sign in"

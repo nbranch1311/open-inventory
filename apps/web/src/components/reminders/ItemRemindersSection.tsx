@@ -11,6 +11,8 @@ import {
   updateReminder,
   type ItemReminder,
 } from '@/actions/reminders'
+import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/Label'
 import { Button } from '@/components/ui/Button'
 
 type ItemRemindersSectionProps = {
@@ -184,29 +186,25 @@ export function ItemRemindersSection({
       {showForm && (
         <form onSubmit={handleCreate} className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--muted)]/30 p-4">
           <div>
-            <label htmlFor="reminder-date" className="block text-sm font-medium text-[var(--foreground)]">
-              Date & time
-            </label>
-            <input
+            <Label htmlFor="reminder-date">Date & time</Label>
+            <Input
               type="datetime-local"
               id="reminder-date"
               value={formDate}
               onChange={(e) => setFormDate(e.target.value)}
               required
-              className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] sm:text-sm"
+              className="mt-1"
             />
           </div>
           <div>
-            <label htmlFor="reminder-message" className="block text-sm font-medium text-[var(--foreground)]">
-              Message (optional)
-            </label>
-            <input
+            <Label htmlFor="reminder-message">Message (optional)</Label>
+            <Input
               type="text"
               id="reminder-message"
               value={formMessage}
               onChange={(e) => setFormMessage(e.target.value)}
               placeholder="e.g. Check expiry"
-              className="mt-1 block min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--input)] p-2 text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] sm:text-sm"
+              className="mt-1"
             />
           </div>
           {formError && (
