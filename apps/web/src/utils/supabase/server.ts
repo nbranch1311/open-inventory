@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 import { Database } from '@/types/database.types'
 
 export async function createClient() {
@@ -28,3 +29,26 @@ export async function createClient() {
     }
   )
 }
+
+type AuthClaims = Record<string, unknown> & {
+  sub?: string
+  email?: string
+}
+
+/**
+ * Server-side auth context for a single Next.js request/render.
+ *
+ * - Uses `getClaims()` to avoid hitting Supabase Auth rate limits.
+ * - Memoized so multiple server actions/components in the same request
+ *   don't re-run auth parsing/validation.
+ */
+export const getServerAuthContext = cache(async () => {
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.getClaims()
+
+  const claims = (data?.claims ?? null) as AuthClaims | null
+  const userId = typeof claims?.sub === 'string' ? claims.sub : null
+  const email = typeof claims?.email === 'string' ? claims.email : null
+
+  return { supabase, userId, email, error }
+})

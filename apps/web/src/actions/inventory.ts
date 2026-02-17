@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createClient, getServerAuthContext } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
 
@@ -61,12 +61,10 @@ type BulkMoveInventoryResult = {
 }
 
 async function getAuthenticatedUserId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  _supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user?.id ?? null
+  const { userId } = await getServerAuthContext()
+  return userId
 }
 
 async function getRoomById(

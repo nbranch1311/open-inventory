@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { getServerAuthContext } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
 
@@ -37,7 +37,7 @@ type DeleteRoomResult = {
 }
 
 async function getUserRoleForHousehold(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getServerAuthContext>>['supabase'],
   userId: string,
   householdId: string,
 ): Promise<string | null> {
@@ -62,15 +62,12 @@ function canManageRooms(role: string | null): boolean {
 export async function getRoomsForHousehold(
   householdId: string,
 ): Promise<{ data?: Room[]; error?: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return { error: 'User not authenticated' }
   }
 
-  const role = await getUserRoleForHousehold(supabase, user.id, householdId)
+  const role = await getUserRoleForHousehold(supabase, userId, householdId)
   if (!role) {
     return { error: 'Access denied for inventory space' }
   }
@@ -98,11 +95,8 @@ export async function createRoom(householdId: string, roomName: string): Promise
     }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return {
       data: null,
       error: 'User not authenticated',
@@ -110,7 +104,7 @@ export async function createRoom(householdId: string, roomName: string): Promise
     }
   }
 
-  const role = await getUserRoleForHousehold(supabase, user.id, householdId)
+  const role = await getUserRoleForHousehold(supabase, userId, householdId)
   if (!canManageRooms(role)) {
     return {
       data: null,
@@ -179,11 +173,8 @@ export async function renameRoom(
     }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return {
       data: null,
       error: 'User not authenticated',
@@ -191,7 +182,7 @@ export async function renameRoom(
     }
   }
 
-  const role = await getUserRoleForHousehold(supabase, user.id, householdId)
+  const role = await getUserRoleForHousehold(supabase, userId, householdId)
   if (!canManageRooms(role)) {
     return {
       data: null,
@@ -231,11 +222,8 @@ export async function deleteRoom(
   roomId: string,
   opts: { confirmNonEmpty?: boolean } = {},
 ): Promise<DeleteRoomResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return {
       success: false,
       error: 'User not authenticated',
@@ -244,7 +232,7 @@ export async function deleteRoom(
     }
   }
 
-  const role = await getUserRoleForHousehold(supabase, user.id, householdId)
+  const role = await getUserRoleForHousehold(supabase, userId, householdId)
   if (!canManageRooms(role)) {
     return {
       success: false,

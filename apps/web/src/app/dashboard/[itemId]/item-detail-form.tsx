@@ -76,7 +76,7 @@ export function ItemDetailForm({ item, documents, reminders, updateAction, delet
     <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
       <div className="mb-4">
         <Button asChild variant="outline">
-          <Link href={`/dashboard?space=${item.household_id}`}>
+          <Link href={`/dashboard?space=${item.household_id}`} prefetch={false}>
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back
           </Link>

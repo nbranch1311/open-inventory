@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Menu, User } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { createClient } from '@/utils/supabase/client'
 
 type AccountMenuProps = {
   email: string
@@ -20,11 +21,44 @@ function getAvatarFallback(email: string) {
 }
 
 export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
+  const [resolvedEmail, setResolvedEmail] = useState(email)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [desktopAccountOpen, setDesktopAccountOpen] = useState(false)
   const desktopMenuContainerRef = useRef<HTMLDivElement | null>(null)
 
-  const avatarFallback = useMemo(() => getAvatarFallback(email), [email])
+  const avatarFallback = useMemo(() => getAvatarFallback(resolvedEmail), [resolvedEmail])
+
+  useEffect(() => {
+    // Tests and some isolated renders may not have env configured.
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return
+    }
+
+    const supabase = createClient()
+    let cancelled = false
+
+    const syncFromSession = async () => {
+      const { data } = await supabase.auth.getSession()
+      const sessionEmail = data.session?.user?.email ?? ''
+      if (!cancelled && sessionEmail) {
+        setResolvedEmail(sessionEmail)
+      }
+    }
+
+    // Hydrate once on mount.
+    void syncFromSession()
+
+    // Keep it updated (sign-in/out, refresh, etc).
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const sessionEmail = session?.user?.email ?? ''
+      setResolvedEmail(sessionEmail || email)
+    })
+
+    return () => {
+      cancelled = true
+      data.subscription.unsubscribe()
+    }
+  }, [email])
 
   useEffect(() => {
     if (!desktopAccountOpen) {
@@ -88,7 +122,7 @@ export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-(--muted) text-sm font-semibold text-foreground">
                 {avatarFallback}
               </span>
-              <span className="max-w-40 truncate text-sm">{email}</span>
+              <span className="max-w-40 truncate text-sm">{resolvedEmail}</span>
             </Button>
 
             {desktopAccountOpen ? (
@@ -100,7 +134,7 @@ export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-(--muted) text-sm font-semibold text-foreground">
                     {avatarFallback}
                   </span>
-                  <p className="truncate text-sm">{email}</p>
+                  <p className="truncate text-sm">{resolvedEmail}</p>
                 </div>
                 <form action={signOutAction} className="mt-3">
                   <Button type="submit" variant="destructive" className="w-full">
@@ -142,7 +176,7 @@ export function AccountMenu({ email, signOutAction }: AccountMenuProps) {
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-(--muted) text-sm font-semibold text-foreground">
                 {avatarFallback}
               </span>
-              <p className="truncate text-sm">{email}</p>
+              <p className="truncate text-sm">{resolvedEmail}</p>
             </div>
             <form action={signOutAction}>
               <Button type="submit" variant="destructive" className="w-full">

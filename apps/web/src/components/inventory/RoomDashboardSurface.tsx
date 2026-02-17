@@ -702,7 +702,10 @@ export function RoomDashboardSurface({
             <div className="flex items-center gap-2">
               {selectedRoom && roomRenameId !== selectedRoom.id ? (
                 <Button asChild>
-                  <Link href={`/dashboard/add?space=${selectedHouseholdId}&room=${selectedRoom.id}`}>
+                  <Link
+                    href={`/dashboard/add?space=${selectedHouseholdId}&room=${selectedRoom.id}`}
+                    prefetch={false}
+                  >
                     <Plus className="h-4 w-4" aria-hidden="true" />
                     Add Item
                   </Link>
@@ -842,7 +845,11 @@ export function RoomDashboardSurface({
                     />
                     Select
                   </label>
-                  <Link href={`/dashboard/${item.id}?household=${item.household_id}`} className="block space-y-1">
+                  <Link
+                    href={`/dashboard/${item.id}?household=${item.household_id}`}
+                    prefetch={false}
+                    className="block space-y-1"
+                  >
                     <p className="flex items-start justify-between gap-3 text-foreground">
                       <span className="font-medium">{item.name}</span>
                       <span className="shrink-0 text-sm text-(--muted-foreground)">

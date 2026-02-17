@@ -221,6 +221,9 @@ Each `InventoryItem` must support:
 - AI can answer inventory questions grounded in current household data.
 - AI cannot execute destructive or purchasing actions.
 - AI writes require explicit user confirmation (default behavior).
+- Provider decision (2026-02-16): Google Gemini Flash is the primary model provider for MVP implementation.
+- Grounding pattern for MVP: function-calling/tool-based inventory lookups (`search_inventory`) against household-scoped Supabase data.
+- Scope boundary: real-time multimodal live voice/video and external calendar execution are post-MVP tracks and do not block MVP closure.
 
 ---
 

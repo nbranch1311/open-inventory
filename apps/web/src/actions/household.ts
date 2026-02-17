@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { getServerAuthContext } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 type HouseholdRecord = {
@@ -181,13 +181,8 @@ export async function createHousehold(name: string) {
   const requestId = globalThis.crypto?.randomUUID?.() ?? 'unknown-request-id'
 
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const { supabase, userId } = await getServerAuthContext()
+    if (!userId) {
       return {
         data: null,
         error: CREATE_HOUSEHOLD_MESSAGES.unauthenticated,
@@ -226,7 +221,7 @@ export async function createHousehold(name: string) {
 
       logCreateHouseholdFailure({
         requestId,
-        userId: user.id,
+        userId,
         stage: 'household_create_rpc',
         errorCode,
         dbCode: householdError?.code,
@@ -273,20 +268,15 @@ export async function createHousehold(name: string) {
 }
 
 export async function getUserHouseholds() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return []
   }
 
   const { data, error } = await supabase
     .from('household_members')
     .select('role, households (*)')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
 
   if (error) {
     console.error('Error fetching user households:', error)
@@ -303,12 +293,8 @@ export async function getInventorySpaceSettings(
   spaceId: string,
 ): Promise<InventorySpaceSettingsResult> {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const { supabase, userId } = await getServerAuthContext()
+    if (!userId) {
       return {
         data: null,
         error: 'User not authenticated',
@@ -316,7 +302,7 @@ export async function getInventorySpaceSettings(
       }
     }
 
-    const membershipResult = await getMembershipForHousehold(supabase, user.id, spaceId)
+    const membershipResult = await getMembershipForHousehold(supabase, userId, spaceId)
     if (membershipResult.error || !membershipResult.data?.households) {
       return {
         data: null,
@@ -359,12 +345,8 @@ export async function renameInventorySpace(
     }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return {
       data: null,
       error: 'User not authenticated',
@@ -372,7 +354,7 @@ export async function renameInventorySpace(
     }
   }
 
-  const membershipResult = await getMembershipForHousehold(supabase, user.id, spaceId)
+  const membershipResult = await getMembershipForHousehold(supabase, userId, spaceId)
   if (membershipResult.error || !membershipResult.data?.households) {
     return {
       data: null,
@@ -417,12 +399,8 @@ export async function deleteInventorySpace(
   spaceId: string,
   opts: DeleteInventorySpaceOptions = {},
 ): Promise<DeleteSelectedInventorySpaceResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return {
       success: false,
       error: 'User not authenticated',
@@ -431,7 +409,7 @@ export async function deleteInventorySpace(
     }
   }
 
-  const membershipResult = await getMembershipForHousehold(supabase, user.id, spaceId)
+  const membershipResult = await getMembershipForHousehold(supabase, userId, spaceId)
   if (membershipResult.error || !membershipResult.data?.households) {
     return {
       success: false,
@@ -513,12 +491,8 @@ export async function deleteInventorySpace(
 
 export async function getCurrentInventorySpaceSettings(): Promise<InventorySpaceSettingsResult> {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const { supabase, userId } = await getServerAuthContext()
+    if (!userId) {
       return {
         data: null,
         error: 'User not authenticated',
@@ -526,7 +500,7 @@ export async function getCurrentInventorySpaceSettings(): Promise<InventorySpace
       }
     }
 
-    const membershipResult = await getCurrentMembershipWithHousehold(supabase, user.id)
+    const membershipResult = await getCurrentMembershipWithHousehold(supabase, userId)
     if (membershipResult.error || !membershipResult.data?.households) {
       return {
         data: null,
@@ -568,12 +542,8 @@ export async function renameCurrentInventorySpace(
     }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return {
       data: null,
       error: 'User not authenticated',
@@ -581,7 +551,7 @@ export async function renameCurrentInventorySpace(
     }
   }
 
-  const membershipResult = await getCurrentMembershipWithHousehold(supabase, user.id)
+  const membershipResult = await getCurrentMembershipWithHousehold(supabase, userId)
   if (membershipResult.error || !membershipResult.data?.households) {
     return {
       data: null,
@@ -625,12 +595,8 @@ export async function renameCurrentInventorySpace(
 export async function deleteCurrentInventorySpace(
   confirmationName: string,
 ): Promise<DeleteInventorySpaceResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
     return {
       success: false,
       error: 'User not authenticated',
@@ -639,7 +605,7 @@ export async function deleteCurrentInventorySpace(
     }
   }
 
-  const membershipResult = await getCurrentMembershipWithHousehold(supabase, user.id)
+  const membershipResult = await getCurrentMembershipWithHousehold(supabase, userId)
   if (membershipResult.error || !membershipResult.data?.households) {
     return {
       success: false,

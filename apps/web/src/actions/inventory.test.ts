@@ -7,6 +7,12 @@ const { mockCreateClient, mockRevalidatePath } = vi.hoisted(() => ({
 
 vi.mock('@/utils/supabase/server', () => ({
   createClient: mockCreateClient,
+  getServerAuthContext: async () => {
+    const supabase = await mockCreateClient()
+    const result = await supabase.auth.getUser()
+    const user = result?.data?.user ?? null
+    return { supabase, userId: user?.id ?? null, email: null, error: null }
+  },
 }))
 
 vi.mock('next/cache', () => ({

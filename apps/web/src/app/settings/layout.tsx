@@ -1,7 +1,6 @@
-import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { AccountMenu } from '@/components/navigation/AccountMenu'
 import { signOut } from '@/actions/auth'
-import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,18 +9,12 @@ export default async function SettingsLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user || !user.email) {
-    redirect('/login')
-  }
+  const headerStore = await headers()
+  const email = headerStore.get('x-oi-user-email') ?? ''
 
   return (
     <div className="min-h-screen bg-background">
-      <AccountMenu email={user.email} signOutAction={signOut} />
+      <AccountMenu email={email} signOutAction={signOut} />
       <main>{children}</main>
     </div>
   )

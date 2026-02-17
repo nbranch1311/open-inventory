@@ -43,7 +43,9 @@ export default async function AddItemPage({ searchParams }: AddItemPageProps) {
           Create a room in your selected Inventory Space before adding items.
         </Alert>
         <Button asChild>
-          <Link href={`/dashboard?space=${selectedHousehold.id}`}>Back to dashboard</Link>
+          <Link href={`/dashboard?space=${selectedHousehold.id}`} prefetch={false}>
+            Back to dashboard
+          </Link>
         </Button>
       </div>
     )

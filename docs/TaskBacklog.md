@@ -1022,6 +1022,29 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
 - **Kickoff Update (2026-02-16):**
   - Reviewer pass returned **GO** for AI phase start.
   - `T-009-AI` is now active with required QA + Security co-ownership.
+- **Provider Decision Update (2026-02-16):**
+  - Owner + AI engineering selected **Google Gemini Flash** as primary provider for `T-009` implementation.
+  - MVP implementation direction remains aligned to spec:
+    - grounded inventory Q&A + suggestions,
+    - strict household scoping,
+    - refusal for destructive/purchasing asks,
+    - explicit confirmation required for write paths.
+  - Technical implementation path for `T-009-AI`:
+    - function-calling style tool contract (`search_inventory`) backed by Supabase household-scoped queries,
+    - no vector DB required for MVP grounded answers.
+  - Scope guardrail:
+    - real-time multimodal live voice/video and calendar execution are **post-MVP expansion** tracks and not required to close `T-009-AI`.
+- **Architecture Progress Gate (2026-02-16):**
+  - Implemented hybrid AI boundary foundations:
+    - Edge assistant gateway (`supabase/functions/ai_assistant`),
+    - Web proxy (`apps/web/src/app/api/ai/ask/route.ts`) calling the gateway with safe fallback,
+    - Live-session broker foundation (`supabase/functions/ai_live_session`) for ephemeral session issuance and policy checks.
+  - Added contract + budget policy utilities in web layer:
+    - `apps/web/src/lib/ai/contracts.ts`
+    - `apps/web/src/lib/ai/cost-policy.ts`
+  - QA + Security evidence:
+    - `docs/AI-QA-Execution-001.md`
+    - Reviewer progress gate: `docs/Project-Review-022.md` (**GO** for progression)
 
 ---
 
@@ -1099,6 +1122,8 @@ These decisions should be resolved early to prevent blockers:
 5. Error copy policy (user-facing vs internal-only diagnostics).
 6. File storage provider and limits (needed by `T-006`).
 7. AI provider and budget caps (needed by `T-009`).
+   - Provider selected: **Google Gemini Flash**.
+   - Remaining owner decision required: explicit budget caps and throttling policy for dev/staging/prod.
 
 ---
 

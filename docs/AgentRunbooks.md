@@ -172,14 +172,16 @@ Implement grounded AI behavior with safe defaults.
 - AI behavior contract from `MvpAppSpec.md`
 - Allowed data context
 - Guardrail requirements
+- Provider contract: Gemini Flash primary provider (`docs/ADR-004-T009-AI-Provider-Gemini-Flash.md`)
 
 ### Procedure
 
 1. Define task-specific prompt contract.
-2. Restrict context to current household data.
-3. Add confidence/uncertainty behavior.
-4. Require confirmation for write actions.
-5. Define eval cases for hallucination and refusal behavior.
+2. Implement function-calling style household-scoped tool usage (start with inventory search tool).
+3. Restrict context to current household data.
+4. Add confidence/uncertainty behavior.
+5. Require confirmation for write actions.
+6. Define eval cases for hallucination and refusal behavior.
 
 ### Must Not
 
