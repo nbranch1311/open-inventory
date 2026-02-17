@@ -42,6 +42,7 @@ const mockItem = {
   unit: 'pcs',
   category_id: null,
   location_id: null,
+  product_id: null,
   status: 'active',
   expiry_date: null,
   purchase_date: null,
@@ -59,7 +60,7 @@ function createSupabaseHarness(resolveValue: { data?: unknown; error: unknown } 
   chain.eq = vi.fn().mockImplementation(() => chain)
   chain.or = vi.fn().mockImplementation(() => chain)
   chain.order = vi.fn().mockImplementation(() => chain)
-  chain.single = vi.fn()
+  chain.single = vi.fn(async () => resolveValue)
 
   // Make chain awaitable (Supabase delete returns a thenable)
   chain.then = function (resolve: (v: { error: unknown }) => void) {
@@ -96,10 +97,33 @@ function createSupabaseHarness(resolveValue: { data?: unknown; error: unknown } 
     })),
   }
 
+  const householdsChain = {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: { workspace_type: 'personal' },
+          error: null,
+        })),
+      })),
+    })),
+  }
+
+  const productsChain: Record<string, unknown> = {}
+  productsChain.insert = vi.fn().mockImplementation(() => productsChain)
+  productsChain.select = vi.fn().mockImplementation(() => productsChain)
+  productsChain.single = vi.fn(async () => ({ data: { id: 'product-1' }, error: null }))
+
+  const movementsChain = {
+    insert: vi.fn(async () => ({ data: null, error: null })),
+  }
+
   const from = vi.fn((table: string) => {
     if (table === 'inventory_items') return chain
     if (table === 'rooms') return roomChain
     if (table === 'household_members') return householdMembersChain
+    if (table === 'households') return householdsChain
+    if (table === 'products') return productsChain
+    if (table === 'inventory_movements') return movementsChain
     throw new Error(`Unexpected table: ${table}`)
   })
   const client = {

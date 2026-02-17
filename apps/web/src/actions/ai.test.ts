@@ -27,16 +27,39 @@ type ItemRow = {
   expiry_date: string | null
 }
 
+type ProductRow = {
+  id: string
+  household_id: string
+  sku: string | null
+  barcode: string | null
+  name: string
+  unit: string | null
+  is_active: boolean
+}
+
+type StockRow = {
+  household_id: string | null
+  product_id: string | null
+  room_id: string | null
+  quantity_on_hand: number | null
+}
+
 function buildClientHarness(options?: {
   userId?: string | null
   membership?: boolean
   items?: ItemRow[]
   itemsError?: unknown
+  workspaceType?: 'personal' | 'business'
+  products?: ProductRow[]
+  stockRows?: StockRow[]
 }) {
   const userId = options?.userId === undefined ? 'user-1' : options.userId
   const membership = options?.membership === undefined ? true : options.membership
   const items = options?.items ?? []
   const itemsError = options?.itemsError ?? null
+  const workspaceType = options?.workspaceType ?? 'personal'
+  const products = options?.products ?? []
+  const stockRows = options?.stockRows ?? []
 
   const itemsOrder = vi.fn(async () => ({
     data: items,
@@ -61,10 +84,49 @@ function buildClientHarness(options?: {
   }))
 
   const from = vi.fn((table: string) => {
+    if (table === 'households') {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn(async () => ({
+              data: { workspace_type: workspaceType },
+              error: null,
+            })),
+          })),
+        })),
+      }
+    }
+
     if (table === 'inventory_items') {
       return {
         select: vi.fn(() => ({
           eq: itemsEq,
+        })),
+      }
+    }
+
+    if (table === 'products') {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(async () => ({
+                data: products,
+                error: null,
+              })),
+            })),
+          })),
+        })),
+      }
+    }
+
+    if (table === 'stock_on_hand') {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({
+            data: stockRows,
+            error: null,
+          })),
         })),
       }
     }
@@ -230,6 +292,112 @@ describe('askInventoryAssistant', () => {
     expect(result.answer).toContain("I couldn't find a grounded match")
     expect(result.clarifyingQuestion).toContain('item name')
     expect(result.citations).toEqual([])
+  })
+
+  it('answers business on-hand questions with product citations', async () => {
+    const harness = buildClientHarness({
+      workspaceType: 'business',
+      items: [],
+      products: [
+        {
+          id: 'product-1',
+          household_id: 'household-1',
+          sku: 'SKU-001',
+          barcode: null,
+          name: 'Almond Milk',
+          unit: 'pcs',
+          is_active: true,
+        },
+      ],
+      stockRows: [
+        {
+          household_id: 'household-1',
+          product_id: 'product-1',
+          room_id: null,
+          quantity_on_hand: 12,
+        },
+      ],
+    })
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await askInventoryAssistant('household-1', {
+      question: 'How many Almond Milk do we have on hand?',
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.confidence).toBe('high')
+    expect(result.answer).toContain('Almond Milk')
+    expect(result.citations).toEqual([
+      {
+        itemId: 'product-1',
+        itemName: 'Almond Milk',
+        quantity: 12,
+        unit: 'pcs',
+        roomId: null,
+        expiryDate: null,
+      },
+    ])
+  })
+
+  it('returns business low-stock summary with restock suggestions', async () => {
+    const harness = buildClientHarness({
+      workspaceType: 'business',
+      items: [],
+      products: [
+        {
+          id: 'product-1',
+          household_id: 'household-1',
+          sku: 'SKU-001',
+          barcode: null,
+          name: 'Almond Milk',
+          unit: 'pcs',
+          is_active: true,
+        },
+      ],
+      stockRows: [
+        {
+          household_id: 'household-1',
+          product_id: 'product-1',
+          room_id: null,
+          quantity_on_hand: 1,
+        },
+      ],
+    })
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await askInventoryAssistant('household-1', {
+      question: 'What is low stock right now?',
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.answer.toLowerCase()).toContain('low stock')
+    expect(result.suggestions).toEqual([
+      expect.objectContaining({
+        type: 'restock',
+        itemId: 'product-1',
+      }),
+    ])
+  })
+
+  it('returns low-confidence prompt when business workspace has no products', async () => {
+    const harness = buildClientHarness({
+      workspaceType: 'business',
+      items: [],
+      products: [],
+      stockRows: [],
+    })
+    mockCreateClient.mockResolvedValue(harness.client)
+
+    const result = await askInventoryAssistant('household-1', {
+      question: 'How many units on hand?',
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.confidence).toBe('low')
+    expect(result.clarifyingQuestion).toBeTruthy()
   })
 
   it('returns expiring-soon summary with reminder suggestions', async () => {

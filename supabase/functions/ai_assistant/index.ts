@@ -58,6 +58,36 @@ type ItemRecord = {
   expiry_date: string | null;
 };
 
+type ProductRecord = {
+  id: string;
+  household_id: string;
+  sku: string | null;
+  barcode: string | null;
+  name: string;
+  unit: string | null;
+  is_active: boolean;
+};
+
+type StockOnHandRecord = {
+  household_id: string | null;
+  product_id: string | null;
+  room_id: string | null;
+  quantity_on_hand: number | null;
+};
+
+type MovementRecord = {
+  id: string;
+  household_id: string;
+  product_id: string;
+  room_id: string | null;
+  movement_type: string;
+  quantity_delta: number;
+  source_type: string | null;
+  source_id: string | null;
+  created_at: string;
+  products?: { id: string; name: string; sku: string | null; unit: string | null } | null;
+};
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
@@ -279,166 +309,450 @@ async function searchInventory(
   return (data ?? []) as ItemRecord[];
 }
 
+async function searchProducts(
+  supabase: ReturnType<typeof createClient>,
+  householdId: string,
+  queryText: string,
+) {
+  const query = queryText.trim()
+    .replace(/[%_]/g, " ")
+    .replace(/[,()]/g, " ")
+    .replace(/\s+/g, " ");
+  if (!query) return [];
+
+  const pattern = `%${query}%`;
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, household_id, sku, barcode, name, unit, is_active")
+    .eq("household_id", householdId)
+    .or(`name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`)
+    .order("updated_at", { ascending: false })
+    .limit(5);
+
+  if (error) return [];
+  return (data ?? []) as ProductRecord[];
+}
+
+async function resolveWorkspaceType(
+  supabase: ReturnType<typeof createClient>,
+  householdId: string,
+): Promise<"personal" | "business"> {
+  const { data, error } = await supabase
+    .from("households")
+    .select("workspace_type")
+    .eq("id", householdId)
+    .single();
+
+  if (error || !data?.workspace_type) return "personal";
+  return data.workspace_type === "business" ? "business" : "personal";
+}
+
+async function resolveProductIdBySku(
+  supabase: ReturnType<typeof createClient>,
+  householdId: string,
+  sku: string,
+): Promise<string | null> {
+  const trimmed = sku.trim();
+  if (!trimmed) return null;
+  const { data, error } = await supabase
+    .from("products")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("sku", trimmed)
+    .single();
+  if (error || !data?.id) return null;
+  return data.id as string;
+}
+
+async function getStockOnHand(
+  supabase: ReturnType<typeof createClient>,
+  householdId: string,
+  args: { productId?: string; sku?: string; roomId?: string },
+) {
+  const productId = args.productId ??
+    (args.sku ? await resolveProductIdBySku(supabase, householdId, args.sku) : null);
+  if (!productId) {
+    return { productId: null, product: null, roomId: args.roomId ?? null, quantityOnHand: 0 };
+  }
+
+  let query = supabase
+    .from("stock_on_hand")
+    .select("household_id, product_id, room_id, quantity_on_hand")
+    .eq("household_id", householdId)
+    .eq("product_id", productId);
+
+  if (args.roomId) {
+    query = query.eq("room_id", args.roomId);
+  }
+
+  const { data, error } = await query;
+  if (error) return { productId, roomId: args.roomId ?? null, quantityOnHand: 0 };
+
+  const rows = (data ?? []) as StockOnHandRecord[];
+  const quantityOnHand = rows.reduce(
+    (sum, row) => sum + Number(row.quantity_on_hand ?? 0),
+    0,
+  );
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, name, sku, unit")
+    .eq("household_id", householdId)
+    .eq("id", productId)
+    .single();
+
+  return {
+    productId,
+    product: product ?? null,
+    roomId: args.roomId ?? null,
+    quantityOnHand,
+  };
+}
+
+async function getMovements(
+  supabase: ReturnType<typeof createClient>,
+  householdId: string,
+  args: { productId?: string; sku?: string; limit?: number },
+) {
+  const limit = Number.isFinite(args.limit) ? Math.max(1, Math.min(25, Number(args.limit))) : 10;
+  const productId = args.productId ??
+    (args.sku ? await resolveProductIdBySku(supabase, householdId, args.sku) : null);
+  if (!productId) return { productId: null, product: null, movements: [] as MovementRecord[] };
+
+  const { data, error } = await supabase
+    .from("inventory_movements")
+    .select(
+      "id, household_id, product_id, room_id, movement_type, quantity_delta, source_type, source_id, created_at, products (id, name, sku, unit)",
+    )
+    .eq("household_id", householdId)
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return { productId, product: null, movements: [] as MovementRecord[] };
+
+  const movements = (data ?? []) as MovementRecord[];
+  const product = movements?.[0]?.products ??
+    (await supabase
+      .from("products")
+      .select("id, name, sku, unit")
+      .eq("household_id", householdId)
+      .eq("id", productId)
+      .single()).data ??
+    null;
+
+  return { productId, product, movements };
+}
+
+async function getLowStock(
+  supabase: ReturnType<typeof createClient>,
+  householdId: string,
+  args: { threshold?: number; limit?: number },
+) {
+  const threshold = Number.isFinite(args.threshold) ? Math.max(0, Number(args.threshold)) : 5;
+  const limit = Number.isFinite(args.limit) ? Math.max(1, Math.min(25, Number(args.limit))) : 10;
+
+  const { data: stockRows, error: stockError } = await supabase
+    .from("stock_on_hand")
+    .select("product_id, quantity_on_hand")
+    .eq("household_id", householdId);
+
+  if (stockError) {
+    return { threshold, products: [] as Array<{ productId: string; quantityOnHand: number }> };
+  }
+
+  const totals = new Map<string, number>();
+  (stockRows ?? []).forEach((row) => {
+    const productId = (row as StockOnHandRecord).product_id;
+    if (!productId) return;
+    const previous = totals.get(productId) ?? 0;
+    totals.set(productId, previous + Number((row as StockOnHandRecord).quantity_on_hand ?? 0));
+  });
+
+  const low = Array.from(totals.entries())
+    .filter(([, qty]) => qty <= threshold)
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, limit)
+    .map(([productId, quantityOnHand]) => ({ productId, quantityOnHand }));
+
+  const productIds = low.map((entry) => entry.productId);
+  const { data: products } = productIds.length > 0
+    ? await supabase
+      .from("products")
+      .select("id, name, sku, unit")
+      .eq("household_id", householdId)
+      .in("id", productIds)
+    : { data: [] as Array<Record<string, unknown>> };
+
+  const productById = new Map<string, Record<string, unknown>>();
+  (products ?? []).forEach((product) => {
+    const id = (product as Record<string, unknown>)?.id;
+    if (typeof id === "string") {
+      productById.set(id, product as Record<string, unknown>);
+    }
+  });
+
+  return {
+    threshold,
+    products: low.map((entry) => ({
+      ...entry,
+      product: productById.get(entry.productId) ?? null,
+    })),
+  };
+}
+
 async function callGeminiWithTools(
   question: string,
   householdId: string,
   supabase: ReturnType<typeof createClient>,
 ) {
   const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    return null;
-  }
+  if (!apiKey) return null;
 
   const model = getGeminiModel();
   const endpoint =
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
+  const workspaceType = await resolveWorkspaceType(supabase, householdId);
   const systemInstruction = `
 You are OpenInventory Assistant.
 Rules:
 1) Ground claims only in tool data.
 2) If no tool evidence exists, respond with uncertainty.
 3) Never perform destructive/purchasing actions.
-4) Use search_inventory tool for inventory checks.
+4) The current workspace_type is "${workspaceType}" ("personal" or "business").
+5) Prefer tools over direct answers; business mode may require multiple tool calls.
 `.trim();
 
-  const firstRequestBody = {
-    systemInstruction: {
-      parts: [{ text: systemInstruction }],
-    },
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: question }],
-      },
-    ],
-    tools: [
-      {
-        functionDeclarations: [
-          {
-            name: "search_inventory",
-            description:
-              "Search inventory items in the current household using a keyword query.",
-            parameters: {
-              type: "object",
-              properties: {
-                query: {
-                  type: "string",
-                  description: "Keyword to search item name/description.",
-                },
+  const tools = [
+    {
+      functionDeclarations: [
+        {
+          name: "search_inventory",
+          description:
+            "Search inventory items in the current household using a keyword query.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "Keyword to search item name/description.",
               },
-              required: ["query"],
+            },
+            required: ["query"],
+          },
+        },
+        {
+          name: "search_products",
+          description:
+            "Search products (SKUs) in the current household using a keyword query.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "Keyword to search product name, SKU, or barcode.",
+              },
+            },
+            required: ["query"],
+          },
+        },
+        {
+          name: "get_stock_on_hand",
+          description:
+            "Get current stock on hand for a product (optionally room-scoped). Requires productId or sku.",
+          parameters: {
+            type: "object",
+            properties: {
+              productId: { type: "string" },
+              sku: { type: "string" },
+              roomId: { type: "string" },
+            },
+            anyOf: [{ required: ["productId"] }, { required: ["sku"] }],
+          },
+        },
+        {
+          name: "get_movements",
+          description:
+            "Get recent inventory movements for a product. Requires productId or sku.",
+          parameters: {
+            type: "object",
+            properties: {
+              productId: { type: "string" },
+              sku: { type: "string" },
+              limit: { type: "number" },
+            },
+            anyOf: [{ required: ["productId"] }, { required: ["sku"] }],
+          },
+        },
+        {
+          name: "get_low_stock",
+          description:
+            "List products whose stock on hand is <= threshold (across all rooms).",
+          parameters: {
+            type: "object",
+            properties: {
+              threshold: { type: "number" },
+              limit: { type: "number" },
             },
           },
-        ],
-      },
-    ],
-  };
-
-  const firstResponse = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
+        },
+      ],
     },
-    body: JSON.stringify(firstRequestBody),
-  });
+  ];
 
-  if (!firstResponse.ok) {
-    return null;
-  }
+  const contents: Array<Record<string, unknown>> = [
+    { role: "user", parts: [{ text: question }] },
+  ];
 
-  const firstPayload = await firstResponse.json();
-  const functionCallPart = firstPayload?.candidates?.[0]?.content?.parts?.find((
-    part: unknown,
-  ) => Boolean((part as Record<string, unknown>)?.functionCall))?.functionCall;
+  let lastCitations: AssistantCitation[] = [];
+  let lastQueryText: string | null = null;
 
-  if (!functionCallPart || functionCallPart?.name !== "search_inventory") {
-    const directText = firstPayload?.candidates?.[0]?.content?.parts?.find((
-      part: unknown,
-    ) => typeof (part as Record<string, unknown>)?.text === "string")?.text;
-    return typeof directText === "string" ? directText : null;
-  }
-
-  const query = (functionCallPart?.args?.query ?? "").toString();
-  const results = await searchInventory(supabase, householdId, query);
-  const citations = results.map(toCitation);
-
-  const secondRequestBody = {
-    systemInstruction: {
-      parts: [{ text: systemInstruction }],
-    },
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: question }],
-      },
-      {
-        role: "model",
-        parts: [{ functionCall: functionCallPart }],
-      },
-      {
-        role: "user",
-        parts: [{
-          functionResponse: {
-            name: "search_inventory",
-            response: {
-              query,
-              items: citations,
-            },
-          },
-        }],
-      },
-    ],
-  };
-
-  const secondResponse = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify(secondRequestBody),
-  });
-
-  if (!secondResponse.ok) {
-    return null;
-  }
-
-  const secondPayload = await secondResponse.json();
-  const answerText = secondPayload?.candidates?.[0]?.content?.parts?.find((
-    part: unknown,
-  ) => typeof (part as Record<string, unknown>)?.text === "string")?.text;
-
-  if (typeof answerText !== "string") {
-    return null;
-  }
-
-  if (citations.length === 0) {
-    return {
-      answer: buildNoMatchResult(query).answer,
-      confidence: "low" as const,
-      citations: [],
-      suggestions: [] as AssistantSuggestion[],
-      clarifyingQuestion: "Can you share a different item name or keyword?",
+  for (let i = 0; i < 4; i += 1) {
+    const requestBody = {
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents,
+      tools,
     };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) return null;
+
+    const payload = await response.json();
+    const candidateParts = payload?.candidates?.[0]?.content?.parts ?? [];
+    const functionCallPart = candidateParts.find((part: unknown) =>
+      Boolean((part as Record<string, unknown>)?.functionCall)
+    )?.functionCall as Record<string, unknown> | undefined;
+
+    if (!functionCallPart || typeof functionCallPart.name !== "string") {
+      const directText = candidateParts.find((part: unknown) =>
+        typeof (part as Record<string, unknown>)?.text === "string"
+      )?.text;
+
+      // Enforce grounding: if we have no tool evidence, respond with uncertainty.
+      if (lastCitations.length === 0) {
+        return {
+          answer: buildNoMatchResult(lastQueryText ?? "your question").answer,
+          confidence: "low" as const,
+          citations: [],
+          suggestions: [] as AssistantSuggestion[],
+          clarifyingQuestion: "Can you share a different item name, SKU, or keyword?",
+        };
+      }
+
+      if (typeof directText !== "string") return null;
+
+      const lowStockThreshold = workspaceType === "business" ? 5 : 1;
+      const suggestions: AssistantSuggestion[] = lastCitations
+        .filter((citation) => citation.quantity <= lowStockThreshold)
+        .map((citation) => ({
+          type: "restock",
+          itemId: citation.itemId,
+          reason: workspaceType === "business"
+            ? `Quantity is low (${lowStockThreshold} or less).`
+            : "Quantity is low (1 or less).",
+        }));
+
+      return {
+        answer: directText,
+        confidence: "high" as const,
+        citations: lastCitations,
+        suggestions,
+        clarifyingQuestion: null,
+      };
+    }
+
+    const toolName = functionCallPart.name as string;
+    const toolArgs = (functionCallPart.args ?? {}) as Record<string, unknown>;
+
+    let toolResponse: Record<string, unknown> = {};
+    let citations: AssistantCitation[] = [];
+
+    if (toolName === "search_inventory") {
+      const query = String(toolArgs.query ?? "").trim();
+      lastQueryText = query || lastQueryText;
+      const results = await searchInventory(supabase, householdId, query);
+      citations = results.map(toCitation);
+      toolResponse = { query, items: citations };
+    } else if (toolName === "search_products") {
+      const query = String(toolArgs.query ?? "").trim();
+      lastQueryText = query || lastQueryText;
+      const results = await searchProducts(supabase, householdId, query);
+      // Treat search_products as an intermediate tool: do not emit quantity citations here.
+      citations = [];
+      toolResponse = { query, products: results };
+    } else if (toolName === "get_stock_on_hand") {
+      const response = await getStockOnHand(supabase, householdId, {
+        productId: typeof toolArgs.productId === "string" ? toolArgs.productId : undefined,
+        sku: typeof toolArgs.sku === "string" ? toolArgs.sku : undefined,
+        roomId: typeof toolArgs.roomId === "string" ? toolArgs.roomId : undefined,
+      });
+      citations = response.productId
+        ? [{
+          itemId: response.productId,
+          itemName: String((response.product as Record<string, unknown> | null)?.name ?? response.productId),
+          quantity: response.quantityOnHand,
+          unit: (response.product as Record<string, unknown> | null)?.unit as string | null ?? null,
+          roomId: response.roomId,
+          expiryDate: null,
+        }]
+        : [];
+      toolResponse = response as unknown as Record<string, unknown>;
+    } else if (toolName === "get_movements") {
+      const response = await getMovements(supabase, householdId, {
+        productId: typeof toolArgs.productId === "string" ? toolArgs.productId : undefined,
+        sku: typeof toolArgs.sku === "string" ? toolArgs.sku : undefined,
+        limit: typeof toolArgs.limit === "number" ? toolArgs.limit : undefined,
+      });
+      citations = response.productId
+        ? [{
+          itemId: response.productId,
+          itemName: String((response.product as Record<string, unknown> | null)?.name ?? response.productId),
+          quantity: 0,
+          unit: (response.product as Record<string, unknown> | null)?.unit as string | null ?? null,
+          roomId: null,
+          expiryDate: null,
+        }]
+        : [];
+      toolResponse = response as unknown as Record<string, unknown>;
+    } else if (toolName === "get_low_stock") {
+      const response = await getLowStock(supabase, householdId, {
+        threshold: typeof toolArgs.threshold === "number" ? toolArgs.threshold : undefined,
+        limit: typeof toolArgs.limit === "number" ? toolArgs.limit : undefined,
+      });
+      citations = response.products.map((entry) => ({
+        itemId: entry.productId,
+        itemName: String((entry.product as Record<string, unknown> | null)?.name ?? entry.productId),
+        quantity: entry.quantityOnHand,
+        unit: (entry.product as Record<string, unknown> | null)?.unit as string | null ?? null,
+        roomId: null,
+        expiryDate: null,
+      }));
+      toolResponse = response as unknown as Record<string, unknown>;
+    } else {
+      return null;
+    }
+
+    if (citations.length > 0) {
+      lastCitations = citations;
+    }
+
+    contents.push({ role: "model", parts: [{ functionCall: functionCallPart }] });
+    contents.push({
+      role: "user",
+      parts: [{ functionResponse: { name: toolName, response: toolResponse } }],
+    });
   }
 
-  const suggestions: AssistantSuggestion[] = citations
-    .filter((citation) => citation.quantity <= 1)
-    .map((citation) => ({
-      type: "restock",
-      itemId: citation.itemId,
-      reason: "Quantity is low (1 or less).",
-    }));
-
-  return {
-    answer: answerText,
-    confidence: "high" as const,
-    citations,
-    suggestions,
-    clarifyingQuestion: null,
-  };
+  return null;
 }
 
 Deno.serve(async (request) => {

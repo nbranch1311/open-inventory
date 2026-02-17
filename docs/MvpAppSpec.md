@@ -19,15 +19,15 @@ For MVP, these refer to the same concept (a user's primary inventory container).
 
 ### Product Goal
 
-Help a single household user quickly know what they have at home, where it is, and what needs attention soon (expiration, low stock, reminders), with AI as an assistant.
+Help users and small businesses reliably track stock, understand what is on hand, and act on upcoming needs (restock, expiration, fulfillment), with AI as an assistant.
 
 ### MVP Success Definition
 
 The MVP is successful if a user can:
 
 1. Create an account and sign in.
-2. Create one Inventory Space.
-3. Add/edit/remove inventory items with basic metadata.
+2. Create one Inventory Space (personal) or Workspace (business).
+3. Add/edit/remove inventory items (personal) OR manage products and stock movements (business).
 4. Upload item-related files/images.
 5. Search inventory with filters and natural language.
 6. Receive useful reminders (expiration/date-based).
@@ -40,9 +40,11 @@ The MVP is successful if a user can:
 ### In Scope (MVP)
 
 - Authentication and user account.
-- Single-user inventory-space management (up to 5 spaces per user).
-- Room-based organization within each Inventory Space (up to 10 rooms per space).
-- Inventory CRUD.
+- Dual-mode workspaces:
+  - personal inventory-space management (up to 5 spaces per user),
+  - business workspace inventory foundations (retail/e-commerce first).
+- Location-based organization within each workspace (rooms remain valid as the MVP location primitive).
+- Inventory CRUD (personal) and transaction-driven inventory (business ledger).
 - Search/filter and AI-assisted query.
 - Document/image upload tied to items.
 - Expiration/reminder support.
@@ -62,8 +64,10 @@ The MVP is successful if a user can:
 
 ### Current Assumptions
 
-- Primary user: one person managing up to five Inventory Spaces.
-- Deployment target: web first, mobile-ready UX (native app can come later).
+- Primary users:
+  - personal: one person managing up to five Inventory Spaces,
+  - business: small business owner/operator managing inventory for retail/e-commerce.
+- Deployment target: web first, cross-client ready (native app is planned; architecture must support it).
 - Data may include receipts/manuals/warranties.
 - AI should help decisions, not make irreversible actions.
 

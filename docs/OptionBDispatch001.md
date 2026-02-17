@@ -6,6 +6,13 @@
 
 ---
 
+## Status Note (Historical)
+
+This dispatch is a **historical execution artifact**. The current source of truth is:
+
+- `docs/TaskBacklog.md` (statuses + acceptance criteria)
+- `docs/Project-Review-*.md` (GO/NO-GO decisions)
+
 ## Dispatch Sequence (Must Stay Ordered)
 
 1. `T-008.5-API` (active)

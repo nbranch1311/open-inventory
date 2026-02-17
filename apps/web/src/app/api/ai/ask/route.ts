@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Request body too large' }, { status: 413 })
   }
 
-  const { userId } = await getServerAuthContext()
+  const { supabase, userId } = await getServerAuthContext()
   if (!userId) {
     return NextResponse.json(
       {
@@ -36,6 +36,25 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: 'householdId and question are required' },
       { status: 400 },
+    )
+  }
+
+  // Route-level authz so we can return deterministic 403s without hitting downstream services.
+  const { data: memberships, error: membershipError } = await supabase
+    .from('household_members')
+    .select('household_id')
+    .eq('user_id', userId)
+    .eq('household_id', householdId)
+    .limit(1)
+
+  if (membershipError || (memberships ?? []).length === 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Access denied for inventory space',
+        errorCode: 'forbidden_household',
+      },
+      { status: 403 },
     )
   }
 

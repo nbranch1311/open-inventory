@@ -20,6 +20,23 @@ type InventoryItemForAssistant = {
   expiry_date: string | null
 }
 
+type ProductForAssistant = {
+  id: string
+  household_id: string
+  sku: string | null
+  barcode: string | null
+  name: string
+  unit: string | null
+  is_active: boolean
+}
+
+type StockOnHandRow = {
+  household_id: string | null
+  product_id: string | null
+  room_id: string | null
+  quantity_on_hand: number | null
+}
+
 export const INVENTORY_ASSISTANT_PROMPT_CONTRACT = `
 You are OpenInventory Assistant. Follow these non-negotiable rules:
 1) Ground every factual claim in provided household inventory data.
@@ -34,6 +51,9 @@ const DESTRUCTIVE_OR_PURCHASING_PATTERN =
 const CROSS_HOUSEHOLD_PATTERN = /\b(other household|another household|someone else|other user)\b/i
 const EXPIRY_INTENT_PATTERN = /\b(expire|expiry|expiring|soon|spoil)\b/i
 const OVERVIEW_INTENT_PATTERN = /\b(what do i have|show inventory|list items|what's in)\b/i
+const BUSINESS_STOCK_INTENT_PATTERN =
+  /\b(on hand|stock|units|qty|quantity|how many|available)\b/i
+const BUSINESS_LOW_STOCK_INTENT_PATTERN = /\b(low stock|restock|reorder)\b/i
 
 const KEYWORD_STOPWORDS = new Set([
   'do',
@@ -77,6 +97,17 @@ function toCitation(item: InventoryItemForAssistant): AssistantCitation {
     unit: item.unit,
     roomId: item.room_id,
     expiryDate: item.expiry_date,
+  }
+}
+
+function toProductCitation(product: ProductForAssistant, quantityOnHand: number): AssistantCitation {
+  return {
+    itemId: product.id,
+    itemName: product.name,
+    quantity: quantityOnHand,
+    unit: product.unit,
+    roomId: null,
+    expiryDate: null,
   }
 }
 
@@ -180,6 +211,139 @@ async function getHouseholdItems(
   }
 
   return { error: false as const, items: (data ?? []) as InventoryItemForAssistant[] }
+}
+
+async function getHouseholdWorkspaceType(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+): Promise<'personal' | 'business'> {
+  const { data, error } = await supabase
+    .from('households')
+    .select('workspace_type')
+    .eq('id', householdId)
+    .single()
+
+  if (error || !data?.workspace_type) {
+    return 'personal'
+  }
+
+  return data.workspace_type === 'business' ? 'business' : 'personal'
+}
+
+async function getHouseholdProductsWithStock(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+) {
+  const [productsResult, stockResult] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, household_id, sku, barcode, name, unit, is_active')
+      .eq('household_id', householdId)
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
+    supabase
+      .from('stock_on_hand')
+      .select('household_id, product_id, room_id, quantity_on_hand')
+      .eq('household_id', householdId),
+  ])
+
+  if (productsResult.error || stockResult.error) {
+    return {
+      error: true as const,
+      products: [] as Array<{ product: ProductForAssistant; onHand: number }>,
+    }
+  }
+
+  const stockRows = (stockResult.data ?? []) as StockOnHandRow[]
+  const stockByProductId = new Map<string, number>()
+  stockRows.forEach((row) => {
+    if (!row.product_id) return
+    const previous = stockByProductId.get(row.product_id) ?? 0
+    stockByProductId.set(row.product_id, previous + Number(row.quantity_on_hand ?? 0))
+  })
+
+  const products = (productsResult.data ?? []) as ProductForAssistant[]
+  return {
+    error: false as const,
+    products: products.map((product) => ({
+      product,
+      onHand: stockByProductId.get(product.id) ?? 0,
+    })),
+  }
+}
+
+function answerBusinessLowStock(
+  products: Array<{ product: ProductForAssistant; onHand: number }>,
+): AskInventoryAssistantSuccess {
+  const low = products
+    .filter((entry) => entry.onHand <= 5)
+    .sort((a, b) => a.onHand - b.onHand)
+    .slice(0, 5)
+
+  if (low.length === 0) {
+    return {
+      success: true,
+      confidence: 'medium',
+      answer: 'I did not find any products at or below the low-stock threshold (5 units).',
+      citations: [],
+      suggestions: [],
+      clarifyingQuestion: 'Do you want a different threshold?',
+    }
+  }
+
+  const citations = low.map((entry) => toProductCitation(entry.product, entry.onHand))
+  const suggestions: AssistantSuggestion[] = low.map((entry) => ({
+    type: 'restock',
+    itemId: entry.product.id,
+    reason: 'Low stock (5 units or less).',
+  }))
+
+  const label = citations.map((c) => `${c.itemName} (${c.quantity})`).join(', ')
+  return {
+    success: true,
+    confidence: 'high',
+    answer: `Low stock products: ${label}. Evidence: ${citations.map((c) => c.itemName).join(', ')}.`,
+    citations,
+    suggestions,
+    clarifyingQuestion: null,
+  }
+}
+
+function answerBusinessAvailability(
+  products: Array<{ product: ProductForAssistant; onHand: number }>,
+  question: string,
+): AskInventoryAssistantSuccess {
+  const keywords = extractKeywords(question)
+  const matches = products.filter((entry) => {
+    const haystack = `${entry.product.name} ${entry.product.sku ?? ''} ${entry.product.barcode ?? ''}`.toLowerCase()
+    return keywords.some((keyword) => haystack.includes(keyword))
+  })
+
+  if (matches.length === 0) {
+    return {
+      success: true,
+      confidence: 'low',
+      answer: "I couldn't find a grounded match for that product in your catalog.",
+      citations: [],
+      suggestions: [],
+      clarifyingQuestion: 'Can you share the product name or SKU?',
+    }
+  }
+
+  const top = matches.slice(0, 3)
+  const citations = top.map((entry) => toProductCitation(entry.product, entry.onHand))
+  const label = citations.map((c) => `${c.itemName}: ${c.quantity} ${c.unit ?? ''}`.trim()).join(', ')
+
+  return {
+    success: true,
+    confidence: 'high',
+    answer: `On hand: ${label}. Evidence: ${citations.map((c) => c.itemName).join(', ')}.`,
+    citations,
+    suggestions: citations
+      .filter((c) => c.quantity <= 5)
+      .map((c) => ({ type: 'restock', itemId: c.itemId, reason: 'Low stock (5 units or less).' })),
+    clarifyingQuestion: null,
+  }
 }
 
 function answerExpiringSoon(items: InventoryItemForAssistant[]): AskInventoryAssistantSuccess {
@@ -303,6 +467,38 @@ export async function askInventoryAssistant(
     CROSS_HOUSEHOLD_PATTERN.test(normalizedQuestion)
   ) {
     return buildRefusalResult()
+  }
+
+  const workspaceType = await getHouseholdWorkspaceType(supabase, householdId)
+  if (workspaceType === 'business') {
+    const productResult = await getHouseholdProductsWithStock(supabase, householdId)
+    if (productResult.error) {
+      return {
+        success: false,
+        error: 'Failed to fetch inventory context',
+        errorCode: 'fetch_failed',
+      }
+    }
+
+    if (productResult.products.length === 0) {
+      return {
+        success: true,
+        confidence: 'low',
+        answer:
+          "I don't have product or movement data to answer that yet. Add a product (or import CSV) and I can give a grounded answer.",
+        citations: [],
+        suggestions: [],
+        clarifyingQuestion: 'Which product do you want to track first?',
+      }
+    }
+
+    if (BUSINESS_LOW_STOCK_INTENT_PATTERN.test(normalizedQuestion)) {
+      return answerBusinessLowStock(productResult.products)
+    }
+
+    if (BUSINESS_STOCK_INTENT_PATTERN.test(normalizedQuestion) || normalizedQuestion.length > 0) {
+      return answerBusinessAvailability(productResult.products, normalizedQuestion)
+    }
   }
 
   const itemsResult = await getHouseholdItems(supabase, householdId)

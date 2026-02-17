@@ -8,6 +8,21 @@ Current status and doc map lives in `STATUS-INDEX.md`.
 
 ---
 
+## Status Note (2026-02-17)
+
+This discovery brief is **historical context**. The project direction has shifted to a **dual-mode** inventory platform:
+
+- `personal` (home/household-like)
+- `business` (retail + e-commerce first)
+
+See:
+
+- Pivot ADR: `docs/ADR-005-Business-Pivot-DualMode-Workspace-Ledger.md`
+- Current scope spec: `docs/MvpAppSpec.md`
+- Execution truth + gates: `docs/TaskBacklog.md` and `docs/Project-Review-*.md`
+
+---
+
 ## 1) Project Snapshot
 
 - **Project name:**

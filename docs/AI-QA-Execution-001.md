@@ -12,6 +12,7 @@
 | Contracts and error mapping | Typed DTOs + HTTP status mapping in `apps/web/src/lib/ai/contracts.ts` | PASS |
 | Budget policy behavior | Unit tests in `apps/web/src/lib/ai/cost-policy.test.ts` | PASS |
 | Grounded assistant behavior | Unit tests in `apps/web/src/actions/ai.test.ts` | PASS |
+| Business ledger assistant behavior | Unit test covers SKU/product stock-on-hand grounding via `products` + `stock_on_hand` | PASS |
 | API request validation and auth mapping | Unit tests in `apps/web/src/app/api/ai/ask/route.test.ts` | PASS |
 | Gateway proxy path | Route uses `askInventoryAssistantViaGateway` with fallback + logging | PASS |
 | Edge AI guardrails | `supabase/functions/ai_assistant/index.ts` | PASS |
@@ -23,7 +24,7 @@
 ## 2) Commands and Results
 
 1. `pnpm --filter @open-inventory/web test "src/lib/ai/cost-policy.test.ts" "src/actions/ai.test.ts" "src/app/api/ai/ask/route.test.ts"`
-   - Result: `Test Files 3 passed (3)`, `Tests 17 passed (17)`.
+   - Result: `Test Files 3 passed (3)`, `Tests 18 passed (18)`.
 2. Security + QA reviewer pass (code review pod)
    - Initial verdict: NO-GO (critical/high findings).
    - Post-remediation verdict: GO for progression.

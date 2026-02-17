@@ -34,6 +34,24 @@ describe('POST /api/ai/ask', () => {
           },
         })),
       },
+      from: vi.fn((table: string) => {
+        if (table !== 'household_members') {
+          throw new Error(`Unexpected table: ${table}`)
+        }
+
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                limit: vi.fn(async () => ({
+                  data: [{ household_id: 'household-1' }],
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        }
+      }),
     })
   })
 
@@ -83,6 +101,7 @@ describe('POST /api/ai/ask', () => {
           },
         })),
       },
+      from: vi.fn(),
     })
 
     const response = await POST(
@@ -102,6 +121,56 @@ describe('POST /api/ai/ask', () => {
     await expect(response.json()).resolves.toMatchObject({
       success: false,
       errorCode: 'unauthenticated',
+    })
+    expect(mockAskInventoryAssistantViaGateway).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 when user is not a member of the household', async () => {
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: {
+            user: { id: 'user-1' },
+          },
+        })),
+      },
+      from: vi.fn((table: string) => {
+        if (table !== 'household_members') {
+          throw new Error(`Unexpected table: ${table}`)
+        }
+
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                limit: vi.fn(async () => ({
+                  data: [],
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        }
+      }),
+    })
+
+    const response = await POST(
+      new Request('http://localhost/api/ai/ask', {
+        method: 'POST',
+        body: JSON.stringify({
+          householdId: 'household-1',
+          question: 'Do I have milk?',
+        }),
+        headers: {
+          'content-type': 'application/json',
+        },
+      }),
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: 'forbidden_household',
     })
     expect(mockAskInventoryAssistantViaGateway).not.toHaveBeenCalled()
   })

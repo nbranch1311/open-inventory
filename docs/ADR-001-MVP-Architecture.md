@@ -1,20 +1,23 @@
 # ADR-001: MVP Architecture & Stack Selection
 
-- **Status:** Proposed
+- **Status:** Accepted (updated for business-first dual-mode direction)
 - **Date:** 2026-02-13
 - **Deciders:** Architecture Agent, User
 - **Consulted:** MvpAppSpec, TaskBacklog
 
 ## Context
 
-We are building "OpenInventory", a household inventory management system.
+We are building "OpenInventory", an inventory management system with dual-mode support:
+
+- personal/home inventory (original intent)
+- small business inventory (business-first direction; retail/e-commerce primary)
 **Key Constraints & Requirements:**
 
 1.  **Greenfield:** Starting from scratch.
 2.  **Team:** "Weaker in backend" constraint; preference for low-maintenance, managed infrastructure.
 3.  **MVP Scope:** Auth, Inventory CRUD, File Uploads (Receipts/Manuals), Search, Reminders, and AI-assisted queries ("Do I have X?").
-4.  **AI Integration:** Requires vector search and LLM processing.
-5.  **Platforms:** Web-first, mobile-responsive.
+4.  **AI Integration:** Requires grounded LLM processing with tool-based data access.
+5.  **Platforms:** Web-first with cross-client support (native apps planned).
 
 The goal is to select a stack that minimizes "plumbing" (setting up auth, db hosting, file servers) and maximizes product velocity.
 
@@ -24,7 +27,7 @@ The goal is to select a stack that minimizes "plumbing" (setting up auth, db hos
 
 - **Frontend:** Next.js (React) with App Router.
 - **Backend:** Supabase (Postgres, GoTrue Auth, Storage, Edge Functions).
-- **AI:** OpenAI API called via Next.js Server Actions; Embeddings stored in Postgres (`pgvector`).
+- **AI:** Gemini via Supabase Edge Functions + function-calling tools; future live sessions brokered via ephemeral tokens.
 - **Pros:**
   - **"Backend-less" feel:** Supabase handles Auth, DB, and Storage with minimal setup.
   - **Postgres:** Strong relational data model for Inventory/Households.
@@ -68,14 +71,14 @@ The goal is to select a stack that minimizes "plumbing" (setting up auth, db hos
 2.  **Database & Auth:** **Supabase**.
     - Why: Provides Postgres (Relational), Auth (Row Level Security is critical for multi-tenant/household security), and Storage (S3-compatible) in one managed platform.
 3.  **Language:** **TypeScript** (End-to-End).
-4.  **AI/Vector Store:** **Supabase `pgvector`** + **OpenAI API**.
-    - Why: Keeps embeddings in the same transaction-safe database as the inventory data.
+4.  **AI Boundary:** **Supabase Edge Functions** + **Gemini**.
+    - Why: Keeps AI execution server-side and reusable across web and native clients while enforcing auth, RLS-backed scoping, and guardrails.
 5.  **Styling:** **Tailwind CSS** + **Shadcn/UI**.
     - Why: Rapid UI development with accessible components.
 
 ## Rationale
 
-This stack specifically addresses the "weaker in backend" constraint by offloading the hardest parts of backend engineering (Auth, Database hosting, File Storage security) to Supabase. Next.js Server Actions allow us to write "backend" logic (like calling OpenAI) within the frontend project structure, keeping the codebase unified and simple to deploy (e.g., to Vercel).
+This stack addresses the "weaker in backend" constraint by offloading auth, DB, and storage to Supabase while keeping a single TypeScript codebase. For cross-client readiness (web + native), the AI boundary is shifted toward Supabase Edge Functions so all clients share the same AI gateway and policy enforcement.
 
 ## Consequences
 
@@ -95,7 +98,7 @@ graph TD
 
     subgraph "Frontend / Edge"
         NextJS -->|Auth & Data| SupabaseClient[Supabase SDK]
-        NextJS -->|Server Actions| OpenAI[OpenAI API]
+        NextJS -->|Edge Gateway| Gemini[Gemini API]
     end
 
     subgraph "Backend Services (Supabase)"
@@ -106,6 +109,5 @@ graph TD
         Postgres -->|pgvector| Embeddings[Vector Index]
     end
 
-    OpenAI -->|Embeddings| NextJS
-    NextJS -->|Store Vectors| Postgres
+    Gemini -->|Grounded Answers| NextJS
 ```

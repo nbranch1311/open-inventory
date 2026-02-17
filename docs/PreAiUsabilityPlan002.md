@@ -6,6 +6,13 @@
 
 ---
 
+## Status Note (Historical)
+
+This plan is a **historical execution artifact**. The current source of truth is:
+
+- `docs/TaskBacklog.md` (statuses + acceptance criteria)
+- `docs/Project-Review-*.md` (GO/NO-GO decisions)
+
 ## 1) Why This Follow-Up Exists
 
 Post-gate owner review identified a practical usability regression:

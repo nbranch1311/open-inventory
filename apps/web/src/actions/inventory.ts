@@ -20,6 +20,7 @@ export type SearchInventoryParams = {
 }
 
 type RoomRecord = Pick<Database['public']['Tables']['rooms']['Row'], 'id' | 'household_id'>
+type HouseholdWorkspaceType = 'personal' | 'business'
 
 type MoveInventoryErrorCode =
   | 'unauthenticated'
@@ -101,6 +102,105 @@ async function userCanAccessHousehold(
   }
 
   return (data ?? []).length > 0
+}
+
+async function resolveHouseholdWorkspaceType(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+): Promise<HouseholdWorkspaceType> {
+  const { data, error } = await supabase
+    .from('households')
+    .select('workspace_type')
+    .eq('id', householdId)
+    .single()
+
+  if (error || !data?.workspace_type) {
+    return 'personal'
+  }
+
+  return data.workspace_type === 'business' ? 'business' : 'personal'
+}
+
+async function ensureProductForInventoryItem(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>
+  householdId: string
+  item: Pick<InventoryItem, 'id' | 'household_id' | 'name' | 'unit' | 'product_id'>
+}): Promise<string | null> {
+  if (params.item.product_id) {
+    return params.item.product_id
+  }
+
+  const { data: product, error: productError } = await params.supabase
+    .from('products')
+    .insert({
+      household_id: params.householdId,
+      name: params.item.name,
+      unit: params.item.unit,
+      is_active: true,
+    })
+    .select('id')
+    .single()
+
+  if (productError || !product?.id) {
+    console.warn('[inventory.ensureProductForInventoryItem] failed', {
+      householdId: params.householdId,
+      itemId: params.item.id,
+      error: productError?.message,
+    })
+    return null
+  }
+
+  const { error: linkError } = await params.supabase
+    .from('inventory_items')
+    .update({ product_id: product.id })
+    .eq('id', params.item.id)
+    .eq('household_id', params.item.household_id)
+
+  if (linkError) {
+    console.warn('[inventory.ensureProductForInventoryItem] link failed', {
+      householdId: params.householdId,
+      itemId: params.item.id,
+      productId: product.id,
+      error: linkError.message,
+    })
+  }
+
+  return product.id
+}
+
+async function bestEffortInsertMovement(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>
+  householdId: string
+  productId: string
+  roomId: string
+  movementType: 'init' | 'adjust'
+  quantityDelta: number
+  createdBy: string
+  note?: string
+}) {
+  if (!Number.isFinite(params.quantityDelta) || params.quantityDelta === 0) {
+    return
+  }
+
+  const { error } = await params.supabase.from('inventory_movements').insert({
+    household_id: params.householdId,
+    product_id: params.productId,
+    room_id: params.roomId,
+    movement_type: params.movementType,
+    quantity_delta: params.quantityDelta,
+    created_by: params.createdBy,
+    note: params.note ?? null,
+  })
+
+  if (error) {
+    console.warn('[inventory.bestEffortInsertMovement] failed', {
+      householdId: params.householdId,
+      productId: params.productId,
+      itemRoomId: params.roomId,
+      movementType: params.movementType,
+      error: error.message,
+    })
+  }
 }
 
 export async function searchInventoryItems(
@@ -272,12 +372,49 @@ export async function createInventoryItem(householdId: string, item: InsertItem)
     return { error: 'Failed to create inventory item' }
   }
 
+  // Dual-mode bridge:
+  // In personal workspaces, mirror item creates into product + movement rows for ledger grounding.
+  const workspaceType = await resolveHouseholdWorkspaceType(supabase, householdId)
+  if (data && workspaceType === 'personal') {
+    const productId = await ensureProductForInventoryItem({
+      supabase,
+      householdId,
+      item: {
+        id: data.id,
+        household_id: data.household_id,
+        name: data.name,
+        unit: data.unit,
+        product_id: data.product_id,
+      },
+    })
+
+    if (productId) {
+      await bestEffortInsertMovement({
+        supabase,
+        householdId,
+        productId,
+        roomId: data.room_id,
+        movementType: 'init',
+        quantityDelta: Number(data.quantity),
+        createdBy: userId,
+        note: 'personal_item_create',
+      })
+    }
+  }
+
   revalidatePath('/dashboard')
   return { data }
 }
 
 export async function updateInventoryItem(householdId: string, itemId: string, item: UpdateItem) {
   const supabase = await createClient()
+
+  const { data: existingItem } = await supabase
+    .from('inventory_items')
+    .select('id, household_id, room_id, name, unit, quantity, product_id')
+    .eq('id', itemId)
+    .eq('household_id', householdId)
+    .single()
 
   // Validate fields when present (mirror createInventoryItem)
   if ('name' in item) {
@@ -339,6 +476,42 @@ export async function updateInventoryItem(householdId: string, itemId: string, i
   }
 
   if (data) {
+    // Dual-mode bridge:
+    // In personal workspaces, mirror quantity changes into movement deltas.
+    const workspaceType = await resolveHouseholdWorkspaceType(supabase, householdId)
+    if (workspaceType === 'personal') {
+      const userId = await getAuthenticatedUserId(supabase)
+      if (userId && existingItem) {
+        const productId = await ensureProductForInventoryItem({
+          supabase,
+          householdId,
+          item: {
+            id: existingItem.id,
+            household_id: existingItem.household_id,
+            name: data.name,
+            unit: data.unit,
+            product_id: existingItem.product_id,
+          },
+        })
+
+        if (productId && 'quantity' in item) {
+          const previous = Number(existingItem.quantity)
+          const next = Number(data.quantity)
+          const delta = next - previous
+          await bestEffortInsertMovement({
+            supabase,
+            householdId,
+            productId,
+            roomId: data.room_id,
+            movementType: 'adjust',
+            quantityDelta: delta,
+            createdBy: userId,
+            note: 'personal_item_update',
+          })
+        }
+      }
+    }
+
     revalidatePath('/dashboard')
     revalidatePath(`/dashboard/${data.id}`)
   }

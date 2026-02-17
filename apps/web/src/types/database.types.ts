@@ -88,18 +88,21 @@ export type Database = {
           id: string
           name: string
           updated_at: string
+          workspace_type: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
           updated_at?: string
+          workspace_type?: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           updated_at?: string
+          workspace_type?: string
         }
         Relationships: []
       }
@@ -113,6 +116,7 @@ export type Database = {
           id: string
           location_id: string | null
           name: string
+          product_id: string | null
           purchase_date: string | null
           quantity: number
           room_id: string
@@ -129,6 +133,7 @@ export type Database = {
           id?: string
           location_id?: string | null
           name: string
+          product_id?: string | null
           purchase_date?: string | null
           quantity?: number
           room_id: string
@@ -145,6 +150,7 @@ export type Database = {
           id?: string
           location_id?: string | null
           name?: string
+          product_id?: string | null
           purchase_date?: string | null
           quantity?: number
           room_id?: string
@@ -172,6 +178,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
           {
@@ -341,6 +354,50 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          barcode: string | null
+          created_at: string
+          household_id: string
+          id: string
+          is_active: boolean
+          name: string
+          sku: string | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          created_at?: string
+          household_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sku?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          created_at?: string
+          household_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sku?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rooms: {
         Row: {
           created_at: string
@@ -373,9 +430,110 @@ export type Database = {
           },
         ]
       }
+      inventory_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          household_id: string
+          id: string
+          movement_type: string
+          note: string | null
+          product_id: string
+          quantity_delta: number
+          room_id: string | null
+          source_id: string | null
+          source_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          household_id: string
+          id?: string
+          movement_type: string
+          note?: string | null
+          product_id: string
+          quantity_delta: number
+          room_id?: string | null
+          source_id?: string | null
+          source_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          household_id?: string
+          id?: string
+          movement_type?: string
+          note?: string | null
+          product_id?: string
+          quantity_delta?: number
+          room_id?: string | null
+          source_id?: string | null
+          source_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      stock_on_hand: {
+        Row: {
+          household_id: string | null
+          product_id: string | null
+          quantity_on_hand: number | null
+          room_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       create_household_with_owner: {
@@ -385,6 +543,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string
+          workspace_type: string
         }[]
       }
       get_my_household_ids: { Args: never; Returns: string[] }

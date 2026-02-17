@@ -6,6 +6,8 @@ Use this as the single queue for MVP delivery.
 
 Terminology note: use **Inventory Space** in user-facing copy. Internal model/task names may still reference `household` until a dedicated schema refactor is explicitly approved.
 
+Business pivot note (2026-02-16): OpenInventory now supports dual-mode direction (`personal` + `business`) with retail/e-commerce as the primary segment. See `docs/ADR-005-Business-Pivot-DualMode-Workspace-Ledger.md`.
+
 ---
 
 ## Backlog Conventions
@@ -1012,6 +1014,12 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
   - No unapproved write actions executed.
   - QA verifies deterministic behavior for core AI scenarios and key failure/refusal paths.
   - Project Reviewer issues explicit GO before `T-009-AI` is considered complete.
+- **Business Pivot Note (2026-02-16):**
+  - AI behavior must support both workspace modes:
+    - personal: item-centric answers and reminders,
+    - business: product + stock movement answers (ledger-backed quantities) with citations to SKUs/movements/orders.
+  - AI tool surface expands after ledger/integration work:
+    - `search_products`, `get_stock_on_hand`, `get_movements`, `get_low_stock`, `get_sell_through`.
 - **Gate Update (2026-02-16):**
   - Option B gate prerequisites are satisfied (`T-008.5-QA` done + Reviewer GO in `docs/Project-Review-014.md`).
   - Pre-AI usability gate was reopened after owner-reported P0 dashboard UX gaps.
