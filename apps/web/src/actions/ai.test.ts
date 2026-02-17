@@ -256,6 +256,7 @@ describe('askInventoryAssistant', () => {
     expect(result.answer).toContain('Evidence')
     expect(result.citations).toEqual([
       {
+        entityType: 'item',
         itemId: 'item-battery',
         itemName: 'AA Batteries',
         quantity: 2,
@@ -330,6 +331,7 @@ describe('askInventoryAssistant', () => {
     expect(result.answer).toContain('Almond Milk')
     expect(result.citations).toEqual([
       {
+        entityType: 'product',
         itemId: 'product-1',
         itemName: 'Almond Milk',
         quantity: 12,

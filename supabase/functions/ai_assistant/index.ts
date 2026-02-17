@@ -1,5 +1,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-expect-error Deno runtime URL import (types not resolved in web TS config)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+
+// Cursor/TS in the monorepo doesn't always load Deno globals for Edge Functions.
+// Declare the minimal shape we use so `Deno.serve` doesn't type-error.
+declare const Deno: {
+  env: { get(key: string): string | undefined };
+  serve: (
+    handler: (request: Request) => Response | Promise<Response>,
+  ) => void;
+};
 
 type AssistantConfidence = "high" | "medium" | "low" | "refuse";
 
@@ -10,6 +20,7 @@ type AssistantSuggestion = {
 };
 
 type AssistantCitation = {
+  entityType: "item" | "product";
   itemId: string;
   itemName: string;
   quantity: number;
@@ -259,6 +270,7 @@ function normalizeQuestion(question: string) {
 
 function toCitation(item: ItemRecord): AssistantCitation {
   return {
+    entityType: "item",
     itemId: item.id,
     itemName: item.name,
     quantity: item.quantity,
@@ -386,7 +398,9 @@ async function getStockOnHand(
   }
 
   const { data, error } = await query;
-  if (error) return { productId, roomId: args.roomId ?? null, quantityOnHand: 0 };
+  if (error) {
+    return { productId, product: null, roomId: args.roomId ?? null, quantityOnHand: 0 };
+  }
 
   const rows = (data ?? []) as StockOnHandRecord[];
   const quantityOnHand = rows.reduce(
@@ -458,7 +472,14 @@ async function getLowStock(
     .eq("household_id", householdId);
 
   if (stockError) {
-    return { threshold, products: [] as Array<{ productId: string; quantityOnHand: number }> };
+    return {
+      threshold,
+      products: [] as Array<{
+        productId: string;
+        quantityOnHand: number;
+        product: Record<string, unknown> | null;
+      }>,
+    };
   }
 
   const totals = new Map<string, number>();
@@ -697,6 +718,7 @@ Rules:
       });
       citations = response.productId
         ? [{
+          entityType: "product",
           itemId: response.productId,
           itemName: String((response.product as Record<string, unknown> | null)?.name ?? response.productId),
           quantity: response.quantityOnHand,
@@ -714,6 +736,7 @@ Rules:
       });
       citations = response.productId
         ? [{
+          entityType: "product",
           itemId: response.productId,
           itemName: String((response.product as Record<string, unknown> | null)?.name ?? response.productId),
           quantity: 0,
@@ -729,6 +752,7 @@ Rules:
         limit: typeof toolArgs.limit === "number" ? toolArgs.limit : undefined,
       });
       citations = response.products.map((entry) => ({
+        entityType: "product",
         itemId: entry.productId,
         itemName: String((entry.product as Record<string, unknown> | null)?.name ?? entry.productId),
         quantity: entry.quantityOnHand,

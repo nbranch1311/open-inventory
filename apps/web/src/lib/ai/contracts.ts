@@ -7,6 +7,7 @@ export type AssistantSuggestion = {
 }
 
 export type AssistantCitation = {
+  entityType: 'item' | 'product'
   itemId: string
   itemName: string
   quantity: number

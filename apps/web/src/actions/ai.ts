@@ -91,6 +91,7 @@ function normalizeText(value: string) {
 
 function toCitation(item: InventoryItemForAssistant): AssistantCitation {
   return {
+    entityType: 'item',
     itemId: item.id,
     itemName: item.name,
     quantity: item.quantity,
@@ -102,6 +103,7 @@ function toCitation(item: InventoryItemForAssistant): AssistantCitation {
 
 function toProductCitation(product: ProductForAssistant, quantityOnHand: number): AssistantCitation {
   return {
+    entityType: 'product',
     itemId: product.id,
     itemName: product.name,
     quantity: quantityOnHand,
@@ -178,7 +180,7 @@ function buildNoMatchResult(): AskInventoryAssistantSuccess {
 }
 
 async function userCanAccessHousehold(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getServerAuthContext>>['supabase'],
   userId: string,
   householdId: string,
 ) {
@@ -197,7 +199,7 @@ async function userCanAccessHousehold(
 }
 
 async function getHouseholdItems(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getServerAuthContext>>['supabase'],
   householdId: string,
 ) {
   const { data, error } = await supabase
@@ -214,7 +216,7 @@ async function getHouseholdItems(
 }
 
 async function getHouseholdWorkspaceType(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getServerAuthContext>>['supabase'],
   householdId: string,
 ): Promise<'personal' | 'business'> {
   const { data, error } = await supabase
@@ -231,7 +233,7 @@ async function getHouseholdWorkspaceType(
 }
 
 async function getHouseholdProductsWithStock(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getServerAuthContext>>['supabase'],
   householdId: string,
 ) {
   const [productsResult, stockResult] = await Promise.all([
