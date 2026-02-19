@@ -15,6 +15,7 @@ export type SearchInventoryParams = {
   keyword?: string
   categoryId?: string
   locationId?: string
+  roomId?: string
   sortBy?: InventorySortBy
   sortOrder?: InventorySortOrder
 }
@@ -62,8 +63,9 @@ type BulkMoveInventoryResult = {
 }
 
 async function getAuthenticatedUserId(
-  _supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string | null> {
+  void supabase
   const { userId } = await getServerAuthContext()
   return userId
 }
@@ -225,6 +227,9 @@ export async function searchInventoryItems(
   }
   if (params.locationId) {
     query = query.eq('location_id', params.locationId)
+  }
+  if (params.roomId) {
+    query = query.eq('room_id', params.roomId)
   }
 
   const sortBy = params.sortBy ?? 'recent'

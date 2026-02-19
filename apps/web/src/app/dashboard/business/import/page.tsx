@@ -9,6 +9,9 @@ type PageProps = {
 export default async function ImportPage({ searchParams }: PageProps) {
   const { space } = await searchParams
   const households = await getUserHouseholds()
+  if (!households) {
+    redirect('/login')
+  }
   if (households.length === 0) {
     redirect('/onboarding')
   }

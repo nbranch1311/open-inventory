@@ -24,6 +24,8 @@ vi.mock('@/utils/supabase/server', () => ({
 import { POST } from './route'
 
 describe('POST /api/ai/ask', () => {
+  const householdId = '11111111-1111-4111-8111-111111111111'
+
   beforeEach(() => {
     vi.clearAllMocks()
     mockCreateClient.mockResolvedValue({
@@ -44,7 +46,7 @@ describe('POST /api/ai/ask', () => {
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
                 limit: vi.fn(async () => ({
-                  data: [{ household_id: 'household-1' }],
+                  data: [{ household_id: householdId }],
                   error: null,
                 })),
               })),
@@ -68,7 +70,9 @@ describe('POST /api/ai/ask', () => {
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toEqual({
+      success: false,
       error: 'Invalid JSON body',
+      errorCode: 'invalid_input',
     })
   })
 
@@ -88,7 +92,9 @@ describe('POST /api/ai/ask', () => {
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toEqual({
+      success: false,
       error: 'householdId and question are required',
+      errorCode: 'invalid_input',
     })
   })
 
@@ -108,7 +114,7 @@ describe('POST /api/ai/ask', () => {
       new Request('http://localhost/api/ai/ask', {
         method: 'POST',
         body: JSON.stringify({
-          householdId: 'household-1',
+          householdId,
           question: 'Do I have milk?',
         }),
         headers: {
@@ -158,7 +164,7 @@ describe('POST /api/ai/ask', () => {
       new Request('http://localhost/api/ai/ask', {
         method: 'POST',
         body: JSON.stringify({
-          householdId: 'household-1',
+          householdId,
           question: 'Do I have milk?',
         }),
         headers: {
@@ -189,7 +195,7 @@ describe('POST /api/ai/ask', () => {
       new Request('http://localhost/api/ai/ask', {
         method: 'POST',
         body: JSON.stringify({
-          householdId: 'household-1',
+          householdId,
           question: 'Do I have milk?',
         }),
         headers: {
@@ -198,7 +204,7 @@ describe('POST /api/ai/ask', () => {
       }),
     )
 
-    expect(mockAskInventoryAssistantViaGateway).toHaveBeenCalledWith('household-1', {
+    expect(mockAskInventoryAssistantViaGateway).toHaveBeenCalledWith(householdId, {
       question: 'Do I have milk?',
     })
     expect(response.status).toBe(200)
@@ -220,7 +226,7 @@ describe('POST /api/ai/ask', () => {
       new Request('http://localhost/api/ai/ask', {
         method: 'POST',
         body: JSON.stringify({
-          householdId: 'household-1',
+          householdId,
           question: 'Do I have milk?',
         }),
         headers: {
@@ -247,7 +253,7 @@ describe('POST /api/ai/ask', () => {
       new Request('http://localhost/api/ai/ask', {
         method: 'POST',
         body: JSON.stringify({
-          householdId: 'household-1',
+          householdId,
           question: 'Do I have milk?',
         }),
         headers: {

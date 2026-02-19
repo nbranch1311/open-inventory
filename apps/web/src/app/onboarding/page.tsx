@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createHousehold } from '@/actions/household'
+import { createClient } from '@/utils/supabase/client'
 import { Loader2 } from 'lucide-react'
 import {
   Card,
@@ -21,6 +22,24 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function ensureSession() {
+      const { data } = await supabase.auth.getSession()
+      if (!cancelled && !data.session) {
+        router.replace('/login')
+      }
+    }
+
+    void ensureSession()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router, supabase])
 
   const handleCreateInventorySpace = async (e: React.FormEvent) => {
     e.preventDefault()

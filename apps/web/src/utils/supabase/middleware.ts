@@ -61,8 +61,12 @@ export async function updateSession(request: NextRequest) {
   // getClaims validates JWT signature/expiry without calling the Auth server.
   const { data, error } = await supabase.auth.getClaims()
   const claims = (data?.claims ?? null) as null | Record<string, unknown>
-  const userId = typeof claims?.sub === 'string' ? claims.sub : null
-  const userEmail = typeof claims?.email === 'string' ? claims.email : ''
+  const role = typeof claims?.role === 'string' ? claims.role : null
+  const aud = typeof claims?.aud === 'string' ? claims.aud : null
+  const hasUserEmail = typeof claims?.email === 'string' && claims.email.includes('@')
+  const isAuthenticated = (role === 'authenticated' || aud === 'authenticated') && hasUserEmail
+  const userId = isAuthenticated && typeof claims?.sub === 'string' ? claims.sub : null
+  const userEmail = isAuthenticated && typeof claims?.email === 'string' ? claims.email : ''
 
   if (process.env.NODE_ENV !== 'production' && process.env.VITEST !== 'true') {
     const isPrefetch =

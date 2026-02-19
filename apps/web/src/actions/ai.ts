@@ -8,6 +8,7 @@ import type {
   AssistantCitation,
   AssistantSuggestion,
 } from '@/lib/ai/contracts'
+import { INVENTORY_ASSISTANT_PROMPT_CONTRACT } from '@/lib/ai/contracts'
 
 type InventoryItemForAssistant = {
   id: string
@@ -36,15 +37,6 @@ type StockOnHandRow = {
   room_id: string | null
   quantity_on_hand: number | null
 }
-
-export const INVENTORY_ASSISTANT_PROMPT_CONTRACT = `
-You are OpenInventory Assistant. Follow these non-negotiable rules:
-1) Ground every factual claim in provided household inventory data.
-2) If evidence is missing, explicitly state uncertainty and ask a clarifying question.
-3) Refuse destructive or purchasing actions.
-4) Never infer cross-household data.
-5) Suggestions are non-destructive and require user confirmation.
-`.trim()
 
 const DESTRUCTIVE_OR_PURCHASING_PATTERN =
   /\b(delete|remove|destroy|wipe|buy|purchase|order|checkout|reorder)\b/i

@@ -34,18 +34,35 @@ export async function askInventoryAssistantViaGateway(
   }
 
   const supabase = await createClient()
+  const { data: sessionResult } = await supabase.auth.getSession()
+  const accessToken = sessionResult.session?.access_token ?? null
 
-  const { data, error } = await supabase.functions.invoke<AskInventoryAssistantResult>(
-    EDGE_AI_FUNCTION_NAME,
-    {
-      body: {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+
+  if (!accessToken || !supabaseUrl || !supabaseAnonKey) {
+    return askInventoryAssistant(householdId, input)
+  }
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/${EDGE_AI_FUNCTION_NAME}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: supabaseAnonKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         householdId,
         question: input.question,
-      },
-    },
-  )
+      }),
+    })
 
-  if (!error && data) {
+    const data = (await response.json()) as AskInventoryAssistantResult
+    if (!response.ok) {
+      throw new Error(`edge_function_http_${response.status}`)
+    }
+
     console.log(
       JSON.stringify({
         event: 'ai_gateway_invoke',
@@ -56,15 +73,15 @@ export async function askInventoryAssistantViaGateway(
       }),
     )
     return data
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'ai_gateway_fallback',
+        timestamp: new Date().toISOString(),
+        household_id: householdId,
+        reason: error instanceof Error ? error.message : 'unknown_error',
+      }),
+    )
+    return askInventoryAssistant(householdId, input)
   }
-
-  console.warn(
-    JSON.stringify({
-      event: 'ai_gateway_fallback',
-      timestamp: new Date().toISOString(),
-      household_id: householdId,
-      reason: error?.message ?? 'empty_gateway_response',
-    }),
-  )
-  return askInventoryAssistant(householdId, input)
 }

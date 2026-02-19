@@ -31,7 +31,15 @@ async function signupAndCreateHousehold(page: import('@playwright/test').Page, p
   await expect(page).toHaveURL(/\/onboarding$/)
   await page.getByLabel('Inventory Space Name').fill(inventorySpaceName)
   await page.getByRole('button', { name: 'Create Inventory Space' }).click()
-  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page).toHaveURL(/\/dashboard(\?.*)?$/)
+}
+
+async function createRoom(page: import('@playwright/test').Page, name: string) {
+  await page.getByRole('button', { name: 'Add Room' }).click()
+  await page.getByLabel('New room name').fill(name)
+  await page.getByRole('button', { name: 'Create room' }).click()
+  await expect(page.getByRole('combobox', { name: 'Select room' })).toBeEnabled()
+  await expect(page.getByRole('heading', { level: 2, name })).toBeVisible()
 }
 
 test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
@@ -39,10 +47,11 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
     await page.setViewportSize({ width: 1280, height: 800 })
     await signupAndCreateHousehold(page, 'qa-crud-desktop-')
 
-    await expect(page.getByText('No items in inventory yet.')).toBeVisible()
+    await createRoom(page, 'Kitchen')
+    await expect(page.getByText('No items found for this room.')).toBeVisible()
 
-    await page.locator('main').getByRole('link', { name: 'Add Item' }).click()
-    await expect(page).toHaveURL(/\/dashboard\/add$/)
+    await page.getByRole('link', { name: 'Add Item' }).click()
+    await expect(page).toHaveURL(/\/dashboard\/add\?/)
 
     await page.getByLabel('Name').fill('AA Battery Pack')
     await page.getByLabel('Quantity').fill('12')
@@ -50,7 +59,7 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
     await page.getByLabel('Description').fill('For remotes and toys')
     await page.getByRole('button', { name: 'Add Item' }).click()
 
-    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page).toHaveURL(/\/dashboard(\?.*)?$/)
     await expect(
       page
         .locator('main a[href^="/dashboard/"]')
@@ -76,7 +85,7 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
     await page.getByLabel('Unit').fill('packs')
     await page.getByRole('button', { name: 'Save Changes' }).click()
 
-    await expect(page).toHaveURL(/\/dashboard$/)
+    await page.waitForURL(/\/dashboard(\?.*)?$/, { timeout: 15000 })
     await expect(
       page
         .locator('main a[href^="/dashboard/"]')
@@ -90,10 +99,11 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
       .filter({ hasText: 'AA Batteries - Updated' })
       .first()
       .click()
+    await expect(page.getByRole('heading', { name: 'Edit Item' })).toBeVisible()
     await page.getByRole('button', { name: 'Delete Item' }).click()
 
-    await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(page.getByText('No items in inventory yet.')).toBeVisible()
+    await expect(page).toHaveURL(/\/dashboard(\?.*)?$/)
+    await expect(page.getByText('No items found for this room.')).toBeVisible()
   })
 
   test('mobile add/edit/delete preserves key UX states', async ({ page }) => {
@@ -101,9 +111,10 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
     await signupAndCreateHousehold(page, 'qa-crud-mobile-')
 
     await expect(page.getByRole('heading', { level: 1, name: /inventory/i })).toBeVisible()
-    await expect(page.getByText('No items in inventory yet.')).toBeVisible()
+    await createRoom(page, 'Pantry')
+    await expect(page.getByText('No items found for this room.')).toBeVisible()
 
-    await page.locator('main').getByRole('link', { name: 'Add Item' }).click()
+    await page.getByRole('link', { name: 'Add Item' }).click()
     await expect(page.getByRole('heading', { name: 'Add New Item' })).toBeVisible()
 
     await page.getByLabel('Name').fill('Milk')
@@ -111,7 +122,7 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
     await page.getByLabel('Unit').fill('gal')
     await page.getByRole('button', { name: 'Add Item' }).click()
 
-    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page).toHaveURL(/\/dashboard(\?.*)?$/)
     const milkCard = page
       .locator('main a[href^="/dashboard/"]')
       .filter({ hasText: 'Milk' })
@@ -123,7 +134,7 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
 
     await page.getByLabel('Quantity').fill('2')
     await page.getByRole('button', { name: 'Save Changes' }).click()
-    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page).toHaveURL(/\/dashboard(\?.*)?$/)
     await expect(page.getByText('2 gal')).toBeVisible()
 
     await page
@@ -132,6 +143,6 @@ test.describe('T-005 CRUD gate: authenticated inventory UX', () => {
       .first()
       .click()
     await page.getByRole('button', { name: 'Delete Item' }).click()
-    await expect(page.getByText('No items in inventory yet.')).toBeVisible()
+    await expect(page.getByText('No items found for this room.')).toBeVisible()
   })
 })

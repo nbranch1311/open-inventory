@@ -56,3 +56,46 @@
 
 **GO** for continued `T-009-AI` implementation (provider integration + cross-client architecture track).  
 `T-009-AI` remains `in_progress` pending full feature acceptance criteria and final Project Reviewer closure.
+
+---
+
+# AI QA Execution 002: T-009-AI Closure Candidate
+
+**Date:** 2026-02-17  
+**Scope:** Close remaining gaps for `T-009-AI` (edge tool loop correctness, auth routing, and E2E coverage).
+
+## 1) Changes Verified
+
+- Edge tool loop hardened + unit-tested:
+  - Preserves Gemini `thought_signature` in function call history.
+  - Handles provider `finishReason` values (`SAFETY`, `RECITATION`, `BLOCKED`) as structured failures.
+- Edge live-session broker env access fixed:
+  - `ai_live_session` now reads env via `Deno.env.get()` first (with safe fallback).
+- API route contract alignment:
+  - `/api/ai/ask` now returns `errorCode: invalid_input` for validation failures.
+  - `/api/ai/ask` and `/api/ai/reachability` validate `householdId` as UUID.
+- Auth UX hardening:
+  - `getUserHouseholds()` returns `null` when unauthenticated; server pages redirect to `/login` vs `/onboarding` correctly.
+  - `/onboarding` now client-redirects to `/login` if no session.
+
+## 2) Commands and Results
+
+1. Unit tests:
+   - `pnpm --filter @open-inventory/web test`
+   - Result: PASS (all web unit tests), including new Gemini tool loop unit tests:
+     - `apps/web/src/lib/ai/GeminiToolLoopEdge.test.ts`
+2. E2E (Playwright):
+   - `CI= pnpm --filter @open-inventory/web exec playwright test qa-ai-assistant.spec.ts`
+   - `CI= pnpm --filter @open-inventory/web exec playwright test qa-auth-p0.spec.ts qa-inventory-crud.spec.ts qa-signup-ai-flow.spec.ts`
+   - Result: PASS for all executed specs.
+
+## 3) Notes / Residual Risks
+
+- Live provider quota can cause reachability checks to return `503 provider_unavailable` (HTTP 429 quota exceeded).
+  - This is expected behavior; the system should degrade safely and report unreachable.
+  - Deterministic behavior remains covered by unit tests (mocked fetch) and the mocked E2E assistant UI tests.
+
+## 4) Gate Recommendation
+
+**READY** for Project Reviewer re-check to close `T-009-AI` (pending reviewer GO/NO-GO).  
+If approved, `T-009-UI` can be unblocked and `T-010` quality gate execution can begin.

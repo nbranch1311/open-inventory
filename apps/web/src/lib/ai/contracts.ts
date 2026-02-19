@@ -55,6 +55,17 @@ export type AskInventoryApiRequest = {
 
 export type AskInventoryApiResponse = AskInventoryAssistantResult | { error: string }
 
+// Keep this out of `'use server'` modules. Next.js enforces that server action files only export
+// async functions, so any shared prompt/contracts must live in a normal module.
+export const INVENTORY_ASSISTANT_PROMPT_CONTRACT = `
+You are OpenInventory Assistant. Follow these non-negotiable rules:
+1) Ground every factual claim in provided household inventory data.
+2) If evidence is missing, explicitly state uncertainty and ask a clarifying question.
+3) Refuse destructive or purchasing actions.
+4) Never infer cross-household data.
+5) Suggestions are non-destructive and require user confirmation.
+`.trim()
+
 export function mapAssistantErrorToHttpStatus(errorCode: AskInventoryAssistantErrorCode) {
   if (errorCode === 'invalid_input') return 400
   if (errorCode === 'unauthenticated') return 401

@@ -33,6 +33,7 @@ export async function createClient() {
 type AuthClaims = Record<string, unknown> & {
   sub?: string
   email?: string
+  role?: string
 }
 
 /**
@@ -47,8 +48,14 @@ export const getServerAuthContext = cache(async () => {
   const { data, error } = await supabase.auth.getClaims()
 
   const claims = (data?.claims ?? null) as AuthClaims | null
-  const userId = typeof claims?.sub === 'string' ? claims.sub : null
-  const email = typeof claims?.email === 'string' ? claims.email : null
+  const role = typeof claims?.role === 'string' ? claims.role : null
+  const aud = typeof (claims as Record<string, unknown> | null)?.aud === 'string'
+    ? String((claims as Record<string, unknown>).aud)
+    : null
+  const hasUserEmail = typeof claims?.email === 'string' && claims.email.includes('@')
+  const isAuthenticated = (role === 'authenticated' || aud === 'authenticated') && hasUserEmail
+  const userId = isAuthenticated && typeof claims?.sub === 'string' ? claims.sub : null
+  const email = isAuthenticated && typeof claims?.email === 'string' ? claims.email : null
 
   return { supabase, userId, email, error }
 })

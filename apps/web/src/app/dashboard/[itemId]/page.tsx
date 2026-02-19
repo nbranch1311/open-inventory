@@ -20,6 +20,10 @@ export default async function ItemDetailPage({ params, searchParams }: PageProps
   const households = await getUserHouseholds()
   const householdId = householdFromUrl ?? households?.[0]?.id
 
+  if (!householdFromUrl && !households) {
+    redirect('/login')
+  }
+
   if (!householdId) {
     redirect('/onboarding')
   }

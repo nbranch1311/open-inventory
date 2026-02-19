@@ -998,7 +998,7 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
 - **Task ID:** `T-009-AI`
 - **Owner Agent:** AI/LLM Agent + Testing/QA Agent + Security/Privacy Agent
 - **Priority:** `P0`
-- **Status:** `in_progress`
+- **Status:** `done`
 - **Effort:** `L`
 - **Dependencies:** `T-005-API`, `T-007-API`, `T-003`, `T-008.5-QA`, `T-008.9a-UI`, `T-008.10-QA`
 - **Objective:** deliver safe AI responses for inventory questions and suggestions.
@@ -1053,6 +1053,10 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
   - QA + Security evidence:
     - `docs/AI-QA-Execution-001.md`
     - Reviewer progress gate: `docs/Project-Review-022.md` (**GO** for progression)
+  - Closure update (2026-02-17):
+    - QA execution refreshed (unit + Playwright), recorded as Execution 002 in `docs/AI-QA-Execution-001.md`.
+    - Edge tool loop unit tests added (thought_signature preservation + no-tool no-match behavior).
+    - Edge live-session env access fixed (Deno-first `getEnv`), and functions redeployed.
 
 ---
 
@@ -1061,7 +1065,7 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
 - **Task ID:** `T-009-UI`
 - **Owner Agent:** UI Frontend Engineer Agent
 - **Priority:** `P0`
-- **Status:** `blocked`
+- **Status:** `todo`
 - **Effort:** `M`
 - **Dependencies:** `T-009-AI`, `T-005.8-UI`
 - **Objective:** chat-like interface for "Ask my inventory".
@@ -1076,6 +1080,8 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
 - **Gate Update (2026-02-16):**
   - Option B gate is satisfied, but owner-prioritized pre-AI usability work is now active.
   - This task remains blocked until `T-009-AI` completes with QA evidence and reviewer GO.
+- Unblock update (2026-02-17):
+  - `T-009-AI` closure prerequisites satisfied; `T-009-UI` is unblocked.
 
 ---
 
@@ -1084,7 +1090,7 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
 - **Task ID:** `T-010`
 - **Owner Agent:** Testing/QA Agent + DevOps/Infra Agent
 - **Priority:** `P0`
-- **Status:** `todo`
+- **Status:** `in_progress`
 - **Effort:** `L`
 - **Dependencies:** `T-004` through `T-009`
 - **Objective:** validate MVP against core flows and prepare controlled release.
@@ -1096,6 +1102,9 @@ Goal: make the app strongly usable without AI before `T-009-*` begins.
   - All core MVP flows pass.
   - No unresolved critical or high security defects.
   - Deployment and rollback process verified.
+- Progress update (2026-02-17):
+  - `pnpm --filter @open-inventory/web test` -> PASS.
+  - `CI= pnpm --filter @open-inventory/web exec playwright test` -> PASS (live reachability spec remains opt-in).
 
 ---
 

@@ -679,7 +679,7 @@ export function RoomDashboardSurface({
 
       {roomDeleteWarning ? (
         <Alert variant="destructive">
-          Room "{roomDeleteWarning.roomName}" has {roomDeleteWarning.itemCount} item(s). Confirm deletion to continue.
+          Room &quot;{roomDeleteWarning.roomName}&quot; has {roomDeleteWarning.itemCount} item(s). Confirm deletion to continue.
           <div className="mt-2 flex gap-2">
             <Button type="button" variant="destructive" onClick={handleConfirmDeleteRoom}>
               Confirm delete room

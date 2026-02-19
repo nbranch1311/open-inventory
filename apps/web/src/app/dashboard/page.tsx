@@ -3,8 +3,9 @@ import {
   type InventorySortBy,
   searchInventoryItems,
 } from '@/actions/inventory'
-import { getRoomsForHousehold } from '@/actions/rooms'
+import { getRoomsForHouseholds } from '@/actions/rooms'
 import { getUpcomingReminders } from '@/actions/reminders'
+import { AIAssistantPanel } from '@/components/ai/AIAssistantPanel'
 import { RoomDashboardSurface } from '@/components/inventory/RoomDashboardSurface'
 import { UpcomingRemindersSection } from '@/components/reminders/UpcomingRemindersSection'
 import { redirect } from 'next/navigation'
@@ -18,7 +19,11 @@ export default async function DashboardPage({
 }) {
   const households = await getUserHouseholds()
 
-  if (!households || households.length === 0) {
+  if (!households) {
+    redirect('/login')
+  }
+
+  if (households.length === 0) {
     redirect('/onboarding')
   }
 
@@ -38,16 +43,20 @@ export default async function DashboardPage({
       : 'recent'
   const selectedRoomIdFromUrl = typeof params?.room === 'string' ? params.room : null
 
-  const [roomsResult, remindersRes] = await Promise.all([
-    getRoomsForHousehold(selectedHousehold.id),
+  const householdIds = households.map((household) => household.id)
+
+  const [allRoomsResult, remindersRes] = await Promise.all([
+    getRoomsForHouseholds(householdIds),
     getUpcomingReminders(selectedHousehold.id, 10),
   ])
-  const selectedSpaceRooms = roomsResult.data ?? []
+
+  const selectedSpaceRooms = allRoomsResult.data?.[selectedHousehold.id] ?? []
   const selectedRoom =
     selectedSpaceRooms.find((room) => room.id === selectedRoomIdFromUrl) ?? selectedSpaceRooms[0] ?? null
 
   const { data: roomItems, error } = await searchInventoryItems(selectedHousehold.id, {
     keyword: q,
+    roomId: selectedRoom?.id ?? undefined,
     sortBy,
     sortOrder:
       sortBy === 'name'
@@ -57,21 +66,16 @@ export default async function DashboardPage({
           : 'desc',
   })
 
-  const allRoomsBySpace = await Promise.all(
-    households.map(async (household) => {
-      const result = await getRoomsForHousehold(household.id)
-      return {
-        spaceId: household.id,
-        spaceName: household.name,
-        rooms: (result.data ?? []).map((room) => ({ id: room.id, name: room.name })),
-      }
-    }),
-  )
+  const allRoomsBySpace = households.map((household) => {
+    const roomsForSpace = allRoomsResult.data?.[household.id] ?? []
+    return {
+      spaceId: household.id,
+      spaceName: household.name,
+      rooms: roomsForSpace.map((room) => ({ id: room.id, name: room.name })),
+    }
+  })
 
-  const selectedRoomItems =
-    selectedRoom && roomItems
-      ? roomItems.filter((item) => item.room_id === selectedRoom.id)
-      : []
+  const selectedRoomItems = roomItems ?? []
 
   const upcomingReminders = remindersRes.error ? [] : (remindersRes.data ?? [])
   const remindersError = remindersRes.error
@@ -86,8 +90,9 @@ export default async function DashboardPage({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">{selectedHousehold.name} Inventory</h1>
+        <AIAssistantPanel householdId={selectedHousehold.id} />
       </div>
 
       <div className="mb-6">

@@ -145,3 +145,30 @@ export async function setProductActive(
   return { data, error: null, errorCode: null }
 }
 
+export async function getProductForHousehold(
+  householdId: string,
+  productId: string,
+): Promise<ProductWithStock | null> {
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
+    return null
+  }
+
+  const [productResult, stockResult] = await Promise.all([
+    supabase.from('products').select('*').eq('household_id', householdId).eq('id', productId).single(),
+    supabase.from('stock_on_hand').select('*').eq('household_id', householdId).eq('product_id', productId),
+  ])
+
+  if (productResult.error || !productResult.data) {
+    return null
+  }
+
+  const stockRows = (stockResult.error ? [] : (stockResult.data ?? [])) as StockOnHandRow[]
+  const stockOnHand = stockRows.reduce((sum, row) => sum + Number(row.quantity_on_hand ?? 0), 0)
+
+  return {
+    ...(productResult.data as Product),
+    stockOnHand,
+  }
+}
+

@@ -3,6 +3,9 @@ import { mapAssistantErrorToHttpStatus, type AskInventoryApiRequest } from '@/li
 import { getServerAuthContext } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get('content-length') ?? '0')
   if (Number.isFinite(contentLength) && contentLength > 10_000) {
@@ -26,7 +29,10 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Partial<AskInventoryApiRequest>
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON body', errorCode: 'invalid_input' },
+      { status: 400 },
+    )
   }
 
   const householdId = body.householdId?.trim() ?? ''
@@ -34,7 +40,14 @@ export async function POST(request: Request) {
 
   if (!householdId || !question) {
     return NextResponse.json(
-      { error: 'householdId and question are required' },
+      { success: false, error: 'householdId and question are required', errorCode: 'invalid_input' },
+      { status: 400 },
+    )
+  }
+
+  if (!UUID_PATTERN.test(householdId)) {
+    return NextResponse.json(
+      { success: false, error: 'householdId must be a UUID', errorCode: 'invalid_input' },
       { status: 400 },
     )
   }

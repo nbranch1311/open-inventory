@@ -18,7 +18,11 @@ type AddItemPageProps = {
 export default async function AddItemPage({ searchParams }: AddItemPageProps) {
   const households = await getUserHouseholds()
 
-  if (!households || households.length === 0) {
+  if (!households) {
+    redirect('/login')
+  }
+
+  if (households.length === 0) {
     redirect('/onboarding')
   }
 

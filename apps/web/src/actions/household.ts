@@ -270,7 +270,7 @@ export async function createHousehold(name: string) {
 export async function getUserHouseholds() {
   const { supabase, userId } = await getServerAuthContext()
   if (!userId) {
-    return []
+    return null
   }
 
   const { data, error } = await supabase

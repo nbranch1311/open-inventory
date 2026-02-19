@@ -56,11 +56,14 @@ test.describe('Business pivot: ledger flows', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'recorded' }).first()).toBeVisible()
 
     await page.getByRole('link', { name: 'Back' }).click()
+    await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible()
     await page.getByRole('link', { name: 'Adjust stock' }).click()
     await expect(page.getByRole('heading', { name: 'Adjust Stock' })).toBeVisible()
     await page.getByLabel('Target quantity (absolute)').fill('2')
     await page.getByRole('button', { name: 'Record adjustment' }).click()
-    await expect(page.getByRole('alert').filter({ hasText: 'adjusted' }).first()).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'adjusted' }).first()).toBeVisible({
+      timeout: 15000,
+    })
   })
 })
 

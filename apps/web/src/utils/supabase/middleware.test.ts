@@ -83,7 +83,7 @@ describe('updateSession', () => {
 
   it('does not redirect protected routes when authenticated', async () => {
     mockGetClaims.mockResolvedValue({
-      data: { claims: { sub: 'user-1', email: 'user@example.com' } },
+      data: { claims: { sub: 'user-1', email: 'user@example.com', role: 'authenticated' } },
       error: null,
     })
     mockCreateServerClient.mockReturnValue({

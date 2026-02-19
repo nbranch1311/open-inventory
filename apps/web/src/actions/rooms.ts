@@ -85,6 +85,50 @@ export async function getRoomsForHousehold(
   return { data: data ?? [] }
 }
 
+/**
+ * Fast-path for dashboards: fetch rooms for multiple inventory spaces in one DB call.
+ *
+ * This intentionally relies on RLS to scope rooms to the authenticated user.
+ * Callers should only pass household IDs that already came from `getUserHouseholds()`.
+ */
+export async function getRoomsForHouseholds(
+  householdIds: string[],
+): Promise<{ data?: Record<string, Room[]>; error?: string }> {
+  const uniqueIds = Array.from(new Set(householdIds.map((id) => id.trim()).filter(Boolean)))
+  if (uniqueIds.length === 0) {
+    return { data: {} }
+  }
+
+  const { supabase, userId } = await getServerAuthContext()
+  if (!userId) {
+    return { error: 'User not authenticated' }
+  }
+
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('*')
+    .in('household_id', uniqueIds)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    return { error: 'Failed to fetch rooms' }
+  }
+
+  const grouped: Record<string, Room[]> = {}
+  for (const room of data ?? []) {
+    const householdId = room.household_id
+    if (!grouped[householdId]) grouped[householdId] = []
+    grouped[householdId].push(room)
+  }
+
+  // Ensure callers always see keys they asked for (even if empty / RLS filtered).
+  for (const householdId of uniqueIds) {
+    if (!grouped[householdId]) grouped[householdId] = []
+  }
+
+  return { data: grouped }
+}
+
 export async function createRoom(householdId: string, roomName: string): Promise<RoomResult> {
   const trimmedName = roomName.trim()
   if (!trimmedName) {

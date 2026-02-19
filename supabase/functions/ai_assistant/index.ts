@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // @ts-expect-error Deno runtime URL import (types not resolved in web TS config)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { callGeminiWithToolsLoop } from "./GeminiToolLoop.ts";
 
 // Cursor/TS in the monorepo doesn't always load Deno globals for Edge Functions.
 // Declare the minimal shape we use so `Deno.serve` doesn't type-error.
@@ -10,6 +11,14 @@ declare const Deno: {
     handler: (request: Request) => Response | Promise<Response>,
   ) => void;
 };
+
+function getEnv(key: string): string | undefined {
+  // Supabase Edge Functions expose secrets via `Deno.env.get()`.
+  // `process.env` can be incomplete depending on runtime/bundling.
+  return (globalThis as unknown as { Deno?: typeof Deno }).Deno?.env?.get(key) ??
+    (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env?.[key];
+}
 
 type AssistantConfidence = "high" | "medium" | "low" | "refuse";
 
@@ -131,9 +140,11 @@ const DESTRUCTIVE_OR_PURCHASING_PATTERN =
   /\b(delete|remove|destroy|wipe|buy|purchase|order|checkout|reorder)\b/i;
 const CROSS_HOUSEHOLD_PATTERN =
   /\b(other household|another household|someone else|other user)\b/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function resolveAllowedOrigins() {
-  return (process.env.AI_ALLOWED_ORIGINS ?? "http://localhost:3000")
+  return (getEnv("AI_ALLOWED_ORIGINS") ?? "http://localhost:3000")
     .split(",")
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
@@ -214,9 +225,9 @@ function parseNumber(value: string | undefined, fallback: number) {
 }
 
 function resolveAiEnvironment() {
-  if (process.env.AI_ENVIRONMENT === "production") return "production";
-  if (process.env.AI_ENVIRONMENT === "staging") return "staging";
-  if (process.env.DENO_DEPLOYMENT_ID) return "production";
+  if (getEnv("AI_ENVIRONMENT") === "production") return "production";
+  if (getEnv("AI_ENVIRONMENT") === "staging") return "staging";
+  if (getEnv("DENO_DEPLOYMENT_ID")) return "production";
   return "development";
 }
 
@@ -224,44 +235,46 @@ function resolveBudgetPolicy() {
   const environment = resolveAiEnvironment();
   if (environment === "production") {
     return {
-      capUsd: parseNumber(process.env.AI_BUDGET_CAP_PROD_USD, 500),
-      mode: process.env.AI_BUDGET_MODE_PROD === "degrade" ? "degrade" : "block",
+      capUsd: parseNumber(getEnv("AI_BUDGET_CAP_PROD_USD"), 500),
+      mode: getEnv("AI_BUDGET_MODE_PROD") === "degrade" ? "degrade" : "block",
     };
   }
 
   if (environment === "staging") {
     return {
-      capUsd: parseNumber(process.env.AI_BUDGET_CAP_STAGING_USD, 50),
-      mode: process.env.AI_BUDGET_MODE_STAGING === "block" ? "block" : "degrade",
+      capUsd: parseNumber(getEnv("AI_BUDGET_CAP_STAGING_USD"), 50),
+      mode: getEnv("AI_BUDGET_MODE_STAGING") === "block" ? "block" : "degrade",
     };
   }
 
   return {
-    capUsd: parseNumber(process.env.AI_BUDGET_CAP_DEV_USD, 25),
-    mode: process.env.AI_BUDGET_MODE_DEV === "block" ? "block" : "degrade",
+    capUsd: parseNumber(getEnv("AI_BUDGET_CAP_DEV_USD"), 25),
+    mode: getEnv("AI_BUDGET_MODE_DEV") === "block" ? "block" : "degrade",
   };
 }
 
 function isBudgetExceeded() {
   const policy = resolveBudgetPolicy();
-  const projected = parseNumber(process.env.AI_PROJECTED_MONTHLY_USD, 0);
-  const requestCost = parseNumber(process.env.AI_ESTIMATED_REQUEST_USD, 0.001);
+  const projected = parseNumber(getEnv("AI_PROJECTED_MONTHLY_USD"), 0);
+  const requestCost = parseNumber(getEnv("AI_ESTIMATED_REQUEST_USD"), 0.001);
   if (policy.mode !== "block") return false;
   return projected + requestCost > policy.capUsd;
 }
 
 function isAiEnabled() {
-  return process.env.AI_ENABLED !== "false";
+  return getEnv("AI_ENABLED") !== "false";
 }
 
 function getGeminiApiKey() {
-  return process.env.GOOGLE_GENERATIVE_AI_API_KEY ??
-    process.env.GEMINI_API_KEY ??
+  return getEnv("GOOGLE_GENERATIVE_AI_API_KEY") ??
+    getEnv("GEMINI_API_KEY") ??
     null;
 }
 
 function getGeminiModel() {
-  return process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+  // Gemini 3 Flash (preview) model id (can be overridden per environment).
+  // Ref: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-flash
+  return getEnv("GEMINI_MODEL") ?? "gemini-3-flash-preview";
 }
 
 function normalizeQuestion(question: string) {
@@ -291,26 +304,70 @@ function buildNoMatchResult(query: string): AssistantSuccess {
   };
 }
 
+function expandSearchVariants(query: string) {
+  const sanitized = query
+    .trim()
+    .toLowerCase()
+    .replace(/[%_]/g, " ")
+    .replace(/[,()]/g, " ")
+    .replace(/\s+/g, " ");
+
+  const variants = new Set<string>();
+  if (sanitized) variants.add(sanitized);
+
+  const tokens = sanitized.split(" ").filter(Boolean);
+  const expandToken = (token: string) => {
+    const t = token.trim().toLowerCase();
+    if (!t) return;
+    variants.add(t);
+    // battery <-> batteries
+    if (t.endsWith("y") && t.length > 2) {
+      variants.add(`${t.slice(0, -1)}ies`);
+    }
+    if (t.endsWith("ies") && t.length > 3) {
+      variants.add(`${t.slice(0, -3)}y`);
+    }
+    // add/remove plural endings
+    if (t.endsWith("es") && t.length > 3) {
+      variants.add(t.slice(0, -2));
+    }
+    if (t.endsWith("s") && t.length > 3) {
+      variants.add(t.slice(0, -1));
+    } else if (!t.endsWith("s") && t.length > 1) {
+      variants.add(`${t}s`);
+    }
+  };
+
+  tokens.forEach(expandToken);
+
+  return Array.from(variants)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 1)
+    .slice(0, 12);
+}
+
 async function searchInventory(
   supabase: ReturnType<typeof createClient>,
   householdId: string,
   queryText: string,
 ) {
-  const query = queryText
-    .trim()
-    .replace(/[%_]/g, " ")
-    .replace(/[,()]/g, " ")
-    .replace(/\s+/g, " ");
-  if (!query) return [];
+  const variants = expandSearchVariants(queryText);
+  if (variants.length === 0) return [];
 
-  const pattern = `%${query}%`;
+  const orFilter = variants
+    .flatMap((variant) => {
+      const pattern = `%${variant}%`;
+      return [`name.ilike.${pattern}`, `description.ilike.${pattern}`];
+    })
+    .join(",");
+
   const { data, error } = await supabase
     .from("inventory_items")
     .select(
       "id, household_id, room_id, name, description, quantity, unit, expiry_date",
     )
     .eq("household_id", householdId)
-    .or(`name.ilike.${pattern},description.ilike.${pattern}`)
+    .or(orFilter)
     .order("created_at", { ascending: false })
     .limit(5);
 
@@ -326,18 +383,25 @@ async function searchProducts(
   householdId: string,
   queryText: string,
 ) {
-  const query = queryText.trim()
-    .replace(/[%_]/g, " ")
-    .replace(/[,()]/g, " ")
-    .replace(/\s+/g, " ");
-  if (!query) return [];
+  const variants = expandSearchVariants(queryText);
+  if (variants.length === 0) return [];
 
-  const pattern = `%${query}%`;
+  const orFilter = variants
+    .flatMap((variant) => {
+      const pattern = `%${variant}%`;
+      return [
+        `name.ilike.${pattern}`,
+        `sku.ilike.${pattern}`,
+        `barcode.ilike.${pattern}`,
+      ];
+    })
+    .join(",");
+
   const { data, error } = await supabase
     .from("products")
     .select("id, household_id, sku, barcode, name, unit, is_active")
     .eq("household_id", householdId)
-    .or(`name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`)
+    .or(orFilter)
     .order("updated_at", { ascending: false })
     .limit(5);
 
@@ -528,7 +592,12 @@ async function callGeminiWithTools(
   supabase: ReturnType<typeof createClient>,
 ) {
   const apiKey = getGeminiApiKey();
-  if (!apiKey) return null;
+  if (!apiKey) {
+    return {
+      failure: true as const,
+      message: "missing_google_generative_ai_api_key",
+    };
+  }
 
   const model = getGeminiModel();
   const endpoint =
@@ -589,7 +658,6 @@ Rules:
               sku: { type: "string" },
               roomId: { type: "string" },
             },
-            anyOf: [{ required: ["productId"] }, { required: ["sku"] }],
           },
         },
         {
@@ -603,7 +671,6 @@ Rules:
               sku: { type: "string" },
               limit: { type: "number" },
             },
-            anyOf: [{ required: ["productId"] }, { required: ["sku"] }],
           },
         },
         {
@@ -622,57 +689,28 @@ Rules:
     },
   ];
 
-  const contents: Array<Record<string, unknown>> = [
-    { role: "user", parts: [{ text: question }] },
-  ];
+  const lowStockThreshold = workspaceType === "business" ? 5 : 1;
 
-  let lastCitations: AssistantCitation[] = [];
-  let lastQueryText: string | null = null;
-
-  for (let i = 0; i < 4; i += 1) {
-    const requestBody = {
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents,
-      tools,
-    };
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) return null;
-
-    const payload = await response.json();
-    const candidateParts = payload?.candidates?.[0]?.content?.parts ?? [];
-    const functionCallPart = candidateParts.find((part: unknown) =>
-      Boolean((part as Record<string, unknown>)?.functionCall)
-    )?.functionCall as Record<string, unknown> | undefined;
-
-    if (!functionCallPart || typeof functionCallPart.name !== "string") {
-      const directText = candidateParts.find((part: unknown) =>
-        typeof (part as Record<string, unknown>)?.text === "string"
-      )?.text;
-
-      // Enforce grounding: if we have no tool evidence, respond with uncertainty.
-      if (lastCitations.length === 0) {
-        return {
-          answer: buildNoMatchResult(lastQueryText ?? "your question").answer,
-          confidence: "low" as const,
-          citations: [],
-          suggestions: [] as AssistantSuggestion[],
-          clarifyingQuestion: "Can you share a different item name, SKU, or keyword?",
-        };
-      }
-
-      if (typeof directText !== "string") return null;
-
-      const lowStockThreshold = workspaceType === "business" ? 5 : 1;
-      const suggestions: AssistantSuggestion[] = lastCitations
+  return await callGeminiWithToolsLoop<AssistantCitation, AssistantSuggestion>({
+    endpoint,
+    apiKey,
+    systemInstruction,
+    tools: tools as Array<Record<string, unknown>>,
+    question,
+    fetchFn: fetch,
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 512,
+    },
+    buildNoMatch: (queryText) => ({
+      answer: buildNoMatchResult(queryText).answer,
+      confidence: "low",
+      citations: [],
+      suggestions: [],
+      clarifyingQuestion: "Can you share a different item name, SKU, or keyword?",
+    }),
+    buildSuggestions: (citations) =>
+      citations
         .filter((citation) => citation.quantity <= lowStockThreshold)
         .map((citation) => ({
           type: "restock",
@@ -680,103 +718,106 @@ Rules:
           reason: workspaceType === "business"
             ? `Quantity is low (${lowStockThreshold} or less).`
             : "Quantity is low (1 or less).",
-        }));
+        })),
+    toolHandlers: {
+      search_inventory: async (toolArgs) => {
+        const query = String(toolArgs.query ?? "").trim();
+        const results = await searchInventory(supabase, householdId, query);
+        const citations = results.map(toCitation);
+        return {
+          lastQueryText: query,
+          citations,
+          toolResponse: { query, items: citations },
+        };
+      },
+      search_products: async (toolArgs) => {
+        const query = String(toolArgs.query ?? "").trim();
+        const results = await searchProducts(supabase, householdId, query);
+        return {
+          lastQueryText: query,
+          citations: [],
+          toolResponse: { query, products: results },
+        };
+      },
+      get_stock_on_hand: async (toolArgs) => {
+        const response = await getStockOnHand(supabase, householdId, {
+          productId: typeof toolArgs.productId === "string" ? toolArgs.productId : undefined,
+          sku: typeof toolArgs.sku === "string" ? toolArgs.sku : undefined,
+          roomId: typeof toolArgs.roomId === "string" ? toolArgs.roomId : undefined,
+        });
 
-      return {
-        answer: directText,
-        confidence: "high" as const,
-        citations: lastCitations,
-        suggestions,
-        clarifyingQuestion: null,
-      };
-    }
+        const citations: AssistantCitation[] = response.productId
+          ? [{
+            entityType: "product" as const,
+            itemId: response.productId,
+            itemName: String(
+              (response.product as Record<string, unknown> | null)?.name ?? response.productId,
+            ),
+            quantity: response.quantityOnHand,
+            unit: (response.product as Record<string, unknown> | null)?.unit as string | null ??
+              null,
+            roomId: response.roomId,
+            expiryDate: null,
+          }]
+          : [];
 
-    const toolName = functionCallPart.name as string;
-    const toolArgs = (functionCallPart.args ?? {}) as Record<string, unknown>;
+        return {
+          citations,
+          toolResponse: response as unknown as Record<string, unknown>,
+        };
+      },
+      get_movements: async (toolArgs) => {
+        const response = await getMovements(supabase, householdId, {
+          productId: typeof toolArgs.productId === "string" ? toolArgs.productId : undefined,
+          sku: typeof toolArgs.sku === "string" ? toolArgs.sku : undefined,
+          limit: typeof toolArgs.limit === "number" ? toolArgs.limit : undefined,
+        });
 
-    let toolResponse: Record<string, unknown> = {};
-    let citations: AssistantCitation[] = [];
+        const citations: AssistantCitation[] = response.productId
+          ? [{
+            entityType: "product" as const,
+            itemId: response.productId,
+            itemName: String(
+              (response.product as Record<string, unknown> | null)?.name ?? response.productId,
+            ),
+            quantity: 0,
+            unit: (response.product as Record<string, unknown> | null)?.unit as string | null ??
+              null,
+            roomId: null,
+            expiryDate: null,
+          }]
+          : [];
 
-    if (toolName === "search_inventory") {
-      const query = String(toolArgs.query ?? "").trim();
-      lastQueryText = query || lastQueryText;
-      const results = await searchInventory(supabase, householdId, query);
-      citations = results.map(toCitation);
-      toolResponse = { query, items: citations };
-    } else if (toolName === "search_products") {
-      const query = String(toolArgs.query ?? "").trim();
-      lastQueryText = query || lastQueryText;
-      const results = await searchProducts(supabase, householdId, query);
-      // Treat search_products as an intermediate tool: do not emit quantity citations here.
-      citations = [];
-      toolResponse = { query, products: results };
-    } else if (toolName === "get_stock_on_hand") {
-      const response = await getStockOnHand(supabase, householdId, {
-        productId: typeof toolArgs.productId === "string" ? toolArgs.productId : undefined,
-        sku: typeof toolArgs.sku === "string" ? toolArgs.sku : undefined,
-        roomId: typeof toolArgs.roomId === "string" ? toolArgs.roomId : undefined,
-      });
-      citations = response.productId
-        ? [{
-          entityType: "product",
-          itemId: response.productId,
-          itemName: String((response.product as Record<string, unknown> | null)?.name ?? response.productId),
-          quantity: response.quantityOnHand,
-          unit: (response.product as Record<string, unknown> | null)?.unit as string | null ?? null,
-          roomId: response.roomId,
-          expiryDate: null,
-        }]
-        : [];
-      toolResponse = response as unknown as Record<string, unknown>;
-    } else if (toolName === "get_movements") {
-      const response = await getMovements(supabase, householdId, {
-        productId: typeof toolArgs.productId === "string" ? toolArgs.productId : undefined,
-        sku: typeof toolArgs.sku === "string" ? toolArgs.sku : undefined,
-        limit: typeof toolArgs.limit === "number" ? toolArgs.limit : undefined,
-      });
-      citations = response.productId
-        ? [{
-          entityType: "product",
-          itemId: response.productId,
-          itemName: String((response.product as Record<string, unknown> | null)?.name ?? response.productId),
-          quantity: 0,
-          unit: (response.product as Record<string, unknown> | null)?.unit as string | null ?? null,
+        return {
+          citations,
+          toolResponse: response as unknown as Record<string, unknown>,
+        };
+      },
+      get_low_stock: async (toolArgs) => {
+        const response = await getLowStock(supabase, householdId, {
+          threshold: typeof toolArgs.threshold === "number" ? toolArgs.threshold : undefined,
+          limit: typeof toolArgs.limit === "number" ? toolArgs.limit : undefined,
+        });
+
+        const citations: AssistantCitation[] = response.products.map((entry) => ({
+          entityType: "product" as const,
+          itemId: entry.productId,
+          itemName: String(
+            (entry.product as Record<string, unknown> | null)?.name ?? entry.productId,
+          ),
+          quantity: entry.quantityOnHand,
+          unit: (entry.product as Record<string, unknown> | null)?.unit as string | null ?? null,
           roomId: null,
           expiryDate: null,
-        }]
-        : [];
-      toolResponse = response as unknown as Record<string, unknown>;
-    } else if (toolName === "get_low_stock") {
-      const response = await getLowStock(supabase, householdId, {
-        threshold: typeof toolArgs.threshold === "number" ? toolArgs.threshold : undefined,
-        limit: typeof toolArgs.limit === "number" ? toolArgs.limit : undefined,
-      });
-      citations = response.products.map((entry) => ({
-        entityType: "product",
-        itemId: entry.productId,
-        itemName: String((entry.product as Record<string, unknown> | null)?.name ?? entry.productId),
-        quantity: entry.quantityOnHand,
-        unit: (entry.product as Record<string, unknown> | null)?.unit as string | null ?? null,
-        roomId: null,
-        expiryDate: null,
-      }));
-      toolResponse = response as unknown as Record<string, unknown>;
-    } else {
-      return null;
-    }
+        }));
 
-    if (citations.length > 0) {
-      lastCitations = citations;
-    }
-
-    contents.push({ role: "model", parts: [{ functionCall: functionCallPart }] });
-    contents.push({
-      role: "user",
-      parts: [{ functionResponse: { name: toolName, response: toolResponse } }],
-    });
-  }
-
-  return null;
+        return {
+          citations,
+          toolResponse: response as unknown as Record<string, unknown>,
+        };
+      },
+    },
+  });
 }
 
 Deno.serve(async (request) => {
@@ -844,6 +885,25 @@ Deno.serve(async (request) => {
     );
   }
 
+  if (!UUID_PATTERN.test(householdId)) {
+    logAiAudit({
+      stage: "validation",
+      householdId,
+      outcome: "failure",
+      errorCode: "invalid_input",
+      metadata: { reason: "invalid_household_id_format" },
+    });
+    return jsonResponse(
+      request,
+      {
+        success: false,
+        error: "householdId must be a UUID",
+        errorCode: "invalid_input",
+      },
+      400,
+    );
+  }
+
   if (question.length > 1_500) {
     return jsonResponse(
       request,
@@ -888,8 +948,8 @@ Deno.serve(async (request) => {
     );
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = getEnv("SUPABASE_URL");
+  const supabaseAnonKey = getEnv("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !supabaseAnonKey) {
     logAiAudit({
       stage: "bootstrap",
@@ -962,19 +1022,24 @@ Deno.serve(async (request) => {
   }
 
   const geminiResult = await callGeminiWithTools(question, householdId, supabase);
-  if (!geminiResult) {
+  if (!geminiResult || ("failure" in geminiResult)) {
     logAiAudit({
       stage: "provider",
       householdId,
       userId: authData.user.id,
       outcome: "failure",
       errorCode: "provider_unavailable",
+      metadata: !geminiResult
+        ? { reason: "unknown" }
+        : { reason: "message" in geminiResult ? geminiResult.message : "unknown" },
     });
     return jsonResponse(
       request,
       {
         success: false,
-        error: "Gemini provider is unavailable",
+        error: `Gemini provider is unavailable${
+          geminiResult && "message" in geminiResult ? ` (${geminiResult.message})` : ""
+        }`,
         errorCode: "provider_unavailable",
       },
       500,

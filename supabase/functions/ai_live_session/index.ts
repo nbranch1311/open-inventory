@@ -1,5 +1,23 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-expect-error Deno runtime URL import (types not resolved in web TS config)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+
+// Cursor/TS in the monorepo doesn't always load Deno globals for Edge Functions.
+// Declare the minimal shape we use so `Deno.serve` doesn't type-error.
+declare const Deno: {
+  env: { get(key: string): string | undefined };
+  serve: (
+    handler: (request: Request) => Response | Promise<Response>,
+  ) => void;
+};
+
+function getEnv(key: string): string | undefined {
+  // Supabase Edge Functions expose secrets via `Deno.env.get()`.
+  // `process.env` can be incomplete depending on runtime/bundling.
+  return (globalThis as unknown as { Deno?: typeof Deno }).Deno?.env?.get(key) ??
+    (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env?.[key];
+}
 
 type RequestBody = {
   householdId?: string;
@@ -41,6 +59,9 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function logLiveAudit(event: {
   stage: string;
   householdId?: string;
@@ -64,7 +85,7 @@ function logLiveAudit(event: {
 }
 
 function resolveAllowedOrigins() {
-  return (process.env.AI_ALLOWED_ORIGINS ?? "http://localhost:3000")
+  return (getEnv("AI_ALLOWED_ORIGINS") ?? "http://localhost:3000")
     .split(",")
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
@@ -112,17 +133,17 @@ function parseInteger(value: string | undefined, fallback: number) {
 }
 
 function isAiEnabled() {
-  return process.env.AI_ENABLED !== "false";
+  return getEnv("AI_ENABLED") !== "false";
 }
 
 function isLiveEnabled() {
-  return process.env.AI_LIVE_ENABLED === "true";
+  return getEnv("AI_LIVE_ENABLED") === "true";
 }
 
 function resolveAiEnvironment() {
-  if (process.env.AI_ENVIRONMENT === "production") return "production";
-  if (process.env.AI_ENVIRONMENT === "staging") return "staging";
-  if (process.env.DENO_DEPLOYMENT_ID) return "production";
+  if (getEnv("AI_ENVIRONMENT") === "production") return "production";
+  if (getEnv("AI_ENVIRONMENT") === "staging") return "staging";
+  if (getEnv("DENO_DEPLOYMENT_ID")) return "production";
   return "development";
 }
 
@@ -130,32 +151,32 @@ function resolveBudgetPolicy() {
   const environment = resolveAiEnvironment();
   if (environment === "production") {
     return {
-      capUsd: parseNumber(process.env.AI_BUDGET_CAP_PROD_USD, 500),
-      mode: process.env.AI_BUDGET_MODE_PROD === "degrade" ? "degrade" : "block",
+      capUsd: parseNumber(getEnv("AI_BUDGET_CAP_PROD_USD"), 500),
+      mode: getEnv("AI_BUDGET_MODE_PROD") === "degrade" ? "degrade" : "block",
     };
   }
   if (environment === "staging") {
     return {
-      capUsd: parseNumber(process.env.AI_BUDGET_CAP_STAGING_USD, 50),
-      mode: process.env.AI_BUDGET_MODE_STAGING === "block" ? "block" : "degrade",
+      capUsd: parseNumber(getEnv("AI_BUDGET_CAP_STAGING_USD"), 50),
+      mode: getEnv("AI_BUDGET_MODE_STAGING") === "block" ? "block" : "degrade",
     };
   }
   return {
-    capUsd: parseNumber(process.env.AI_BUDGET_CAP_DEV_USD, 25),
-    mode: process.env.AI_BUDGET_MODE_DEV === "block" ? "block" : "degrade",
+    capUsd: parseNumber(getEnv("AI_BUDGET_CAP_DEV_USD"), 25),
+    mode: getEnv("AI_BUDGET_MODE_DEV") === "block" ? "block" : "degrade",
   };
 }
 
 function isLiveBudgetExceeded() {
   const policy = resolveBudgetPolicy();
   if (policy.mode !== "block") return false;
-  const projected = parseNumber(process.env.AI_PROJECTED_MONTHLY_USD, 0);
-  const requestCost = parseNumber(process.env.AI_LIVE_ESTIMATED_REQUEST_USD, 0.005);
+  const projected = parseNumber(getEnv("AI_PROJECTED_MONTHLY_USD"), 0);
+  const requestCost = parseNumber(getEnv("AI_LIVE_ESTIMATED_REQUEST_USD"), 0.005);
   return projected + requestCost > policy.capUsd;
 }
 
 function resolveAllowedClients() {
-  const raw = process.env.AI_LIVE_ALLOWED_CLIENTS ?? "web,ios,android";
+  const raw = getEnv("AI_LIVE_ALLOWED_CLIENTS") ?? "web,ios,android";
   const clients = raw.split(",").map((value) => value.trim().toLowerCase());
   const result: Array<"web" | "ios" | "android"> = [];
 
@@ -163,11 +184,13 @@ function resolveAllowedClients() {
   if (clients.includes("ios")) result.push("ios");
   if (clients.includes("android")) result.push("android");
 
-  return result.length > 0 ? result : ["web", "ios", "android"];
+  return result.length > 0
+    ? result
+    : (["web", "ios", "android"] as Array<"web" | "ios" | "android">);
 }
 
 function resolveAllowedModalities() {
-  const raw = process.env.AI_LIVE_ALLOWED_MODALITIES ?? "audio,video,text";
+  const raw = getEnv("AI_LIVE_ALLOWED_MODALITIES") ?? "audio,video,text";
   const modalities = raw.split(",").map((value) => value.trim().toLowerCase());
   const result: Array<"audio" | "video" | "text"> = [];
 
@@ -175,7 +198,9 @@ function resolveAllowedModalities() {
   if (modalities.includes("video")) result.push("video");
   if (modalities.includes("text")) result.push("text");
 
-  return result.length > 0 ? result : ["audio", "video", "text"];
+  return result.length > 0
+    ? result
+    : (["audio", "video", "text"] as Array<"audio" | "video" | "text">);
 }
 
 function encodeBase64Url(input: Uint8Array) {
@@ -300,9 +325,29 @@ Deno.serve(async (request) => {
     );
   }
 
-  const requestedModalities = body.modalities && body.modalities.length > 0
-    ? body.modalities
-    : ["audio", "text"];
+  if (!UUID_PATTERN.test(householdId)) {
+    logLiveAudit({
+      stage: "validation",
+      householdId,
+      outcome: "failure",
+      errorCode: "invalid_input",
+      metadata: { reason: "invalid_household_id_format" },
+    });
+    return jsonResponse(
+      request,
+      {
+        success: false,
+        error: "householdId must be a UUID",
+        errorCode: "invalid_input",
+      },
+      400,
+    );
+  }
+
+  const requestedModalities: Array<"audio" | "video" | "text"> =
+    body.modalities && body.modalities.length > 0
+      ? body.modalities
+      : ["audio", "text"];
   const allowedModalities = resolveAllowedModalities();
   const disallowedModality = requestedModalities.find((value) =>
     !allowedModalities.includes(value)
@@ -348,7 +393,7 @@ Deno.serve(async (request) => {
   }
 
   const maxConcurrencyPerUser = parseInteger(
-    process.env.AI_LIVE_MAX_CONCURRENCY_PER_USER,
+    getEnv("AI_LIVE_MAX_CONCURRENCY_PER_USER"),
     2,
   );
   const requestedConcurrency = body.requestedConcurrency ?? 1;
@@ -393,8 +438,8 @@ Deno.serve(async (request) => {
     );
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = getEnv("SUPABASE_URL");
+  const supabaseAnonKey = getEnv("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !supabaseAnonKey) {
     logLiveAudit({
       stage: "bootstrap",
@@ -467,13 +512,13 @@ Deno.serve(async (request) => {
   }
 
   const ttlSeconds = Math.min(
-    parseInteger(process.env.AI_LIVE_SESSION_TTL_SECONDS, 300),
+    parseInteger(getEnv("AI_LIVE_SESSION_TTL_SECONDS"), 300),
     900,
   );
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAtEpoch = issuedAt + ttlSeconds;
 
-  const signingSecret = process.env.AI_LIVE_BROKER_SECRET;
+  const signingSecret = getEnv("AI_LIVE_BROKER_SECRET");
   if (!signingSecret) {
     logLiveAudit({
       stage: "provider",

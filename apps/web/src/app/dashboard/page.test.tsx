@@ -4,7 +4,7 @@ import DashboardPage from './page'
 
 const mockGetUserHouseholds = vi.fn()
 const mockSearchInventoryItems = vi.fn()
-const mockGetRoomsForHousehold = vi.fn()
+const mockGetRoomsForHouseholds = vi.fn()
 const mockGetUpcomingReminders = vi.fn()
 const mockRedirect = vi.fn()
 const mockRoomDashboardSurface = vi.fn<(props: unknown) => void>()
@@ -18,7 +18,7 @@ vi.mock('@/actions/inventory', () => ({
 }))
 
 vi.mock('@/actions/rooms', () => ({
-  getRoomsForHousehold: (...args: unknown[]) => mockGetRoomsForHousehold(...args),
+  getRoomsForHouseholds: (...args: unknown[]) => mockGetRoomsForHouseholds(...args),
 }))
 
 vi.mock('@/actions/reminders', () => ({
@@ -50,22 +50,6 @@ describe('DashboardPage', () => {
     mockSearchInventoryItems.mockResolvedValue({
       data: [
         {
-          id: 'item-1',
-          household_id: 'space-2',
-          room_id: 'room-a',
-          name: 'Battery',
-          quantity: 2,
-          unit: 'pcs',
-          description: null,
-          category_id: null,
-          location_id: null,
-          status: 'active',
-          expiry_date: null,
-          purchase_date: null,
-          created_at: '2026-02-16T00:00:00.000Z',
-          updated_at: '2026-02-16T00:00:00.000Z',
-        },
-        {
           id: 'item-2',
           household_id: 'space-2',
           room_id: 'room-b',
@@ -84,28 +68,27 @@ describe('DashboardPage', () => {
       ],
       error: null,
     })
-    mockGetRoomsForHousehold.mockImplementation(async (householdId: string) => {
-      if (householdId === 'space-2') {
-        return {
-          data: [
-            {
-              id: 'room-a',
-              household_id: 'space-2',
-              name: 'Storage',
-              created_at: '2026-02-16T00:00:00.000Z',
-              updated_at: '2026-02-16T00:00:00.000Z',
-            },
-            {
-              id: 'room-b',
-              household_id: 'space-2',
-              name: 'Kitchen',
-              created_at: '2026-02-16T00:00:00.000Z',
-              updated_at: '2026-02-16T00:00:00.000Z',
-            },
-          ],
-        }
-      }
-      return { data: [] }
+    mockGetRoomsForHouseholds.mockResolvedValue({
+      data: {
+        'space-1': [],
+        'space-2': [
+          {
+            id: 'room-a',
+            household_id: 'space-2',
+            name: 'Storage',
+            created_at: '2026-02-16T00:00:00.000Z',
+            updated_at: '2026-02-16T00:00:00.000Z',
+          },
+          {
+            id: 'room-b',
+            household_id: 'space-2',
+            name: 'Kitchen',
+            created_at: '2026-02-16T00:00:00.000Z',
+            updated_at: '2026-02-16T00:00:00.000Z',
+          },
+        ],
+      },
+      error: null,
     })
 
     const ui = await DashboardPage({
@@ -121,7 +104,7 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('room-dashboard-surface')).toBeInTheDocument()
     expect(mockSearchInventoryItems).toHaveBeenCalledWith(
       'space-2',
-      expect.objectContaining({ sortBy: 'recent' }),
+      expect.objectContaining({ sortBy: 'recent', roomId: 'room-b' }),
     )
 
     const props = mockRoomDashboardSurface.mock.calls[0][0] as {
@@ -131,6 +114,7 @@ describe('DashboardPage', () => {
     }
     expect(props.selectedHouseholdId).toBe('space-2')
     expect(props.selectedRoomId).toBe('room-b')
+    // Dashboard now queries room-scoped items directly, so it should pass through the returned list.
     expect(props.items).toHaveLength(1)
     expect(props.items[0].id).toBe('item-2')
   })

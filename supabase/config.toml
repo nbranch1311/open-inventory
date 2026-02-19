@@ -4,6 +4,15 @@
 # working directory name when running `supabase init`.
 project_id = "open-inventory"
 
+[functions.ai_assistant]
+# Supabase projects using modern JWT signing keys can reject user access tokens when
+# relying on the platform-level `verify_jwt`. We validate the JWT in-function instead.
+verify_jwt = false
+
+[functions.ai_live_session]
+# Same as ai_assistant: validate JWT in-function.
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getUserHouseholds } from '@/actions/household'
 import { getRoomsForHousehold } from '@/actions/rooms'
 import { getProductsForHousehold } from '@/actions/products'
+import { AIAssistantPanel } from '@/components/ai/AIAssistantPanel'
 import { Alert } from '@/components/ui/Alert'
 import { WorkspaceRoomPicker } from './workspace-room-picker'
 
@@ -13,6 +14,10 @@ type PageProps = {
 export default async function BusinessDashboardPage({ searchParams }: PageProps) {
   const { space, room } = await searchParams
   const households = await getUserHouseholds()
+
+  if (!households) {
+    redirect('/login')
+  }
 
   if (households.length === 0) {
     redirect('/onboarding')
@@ -31,6 +36,9 @@ export default async function BusinessDashboardPage({ searchParams }: PageProps)
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <AIAssistantPanel householdId={selectedHouseholdId} />
+      </div>
       {workspaceType !== 'business' ? (
         <Alert>
           This workspace is currently in personal mode. Business workflows are available, but you may want a dedicated
@@ -85,12 +93,17 @@ export default async function BusinessDashboardPage({ searchParams }: PageProps)
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
-              <div key={product.id} className="rounded-md border border-(--border) bg-background p-3">
+              <Link
+                key={product.id}
+                href={`/dashboard/business/products/${product.id}?space=${selectedHouseholdId}`}
+                className="rounded-md border border-(--border) bg-background p-3 hover:bg-(--muted)"
+                aria-label={`View product ${product.name}`}
+              >
                 <p className="font-medium text-foreground">{product.name}</p>
                 <p className="text-sm text-(--muted-foreground)">
                   SKU: {product.sku ?? '—'} | On hand: {product.stockOnHand} {product.unit ?? ''}
                 </p>
-              </div>
+              </Link>
             ))}
           </div>
         )}

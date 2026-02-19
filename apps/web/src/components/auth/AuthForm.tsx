@@ -78,7 +78,12 @@ export function AuthForm({
                 id={`${mode}-email`}
                 name="email"
                 type="email"
-                autoComplete="email"
+                // Many password managers key off `autocomplete="username"` even if the value is an email.
+                autoComplete="username"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}

@@ -11,6 +11,9 @@ type PageProps = {
 export default async function AdjustPage({ searchParams }: PageProps) {
   const { space, room } = await searchParams
   const households = await getUserHouseholds()
+  if (!households) {
+    redirect('/login')
+  }
   if (households.length === 0) {
     redirect('/onboarding')
   }
