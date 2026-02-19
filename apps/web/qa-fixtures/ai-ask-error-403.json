@@ -1,0 +1,5 @@
+{
+  "success": false,
+  "error": "Access denied for inventory space",
+  "errorCode": "forbidden_household"
+}

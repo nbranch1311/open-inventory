@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "answer": "Yes, I found 1 matching item(s): AA Batteries (2 pack). Evidence: AA Batteries.",
+  "confidence": "high",
+  "citations": [
+    {
+      "entityType": "item",
+      "itemId": "item-fixture-battery",
+      "itemName": "AA Batteries",
+      "quantity": 2,
+      "unit": "pack",
+      "roomId": "room-fixture-1",
+      "expiryDate": null
+    }
+  ],
+  "suggestions": [],
+  "clarifyingQuestion": null
+}

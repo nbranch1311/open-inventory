@@ -1,0 +1,5 @@
+{
+  "success": false,
+  "error": "Something went wrong. Please try again later.",
+  "errorCode": "provider_unavailable"
+}

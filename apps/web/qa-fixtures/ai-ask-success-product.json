@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "answer": "On hand: Widget Pro: 15 units. Evidence: Widget Pro.",
+  "confidence": "high",
+  "citations": [
+    {
+      "entityType": "product",
+      "itemId": "product-fixture-widget",
+      "itemName": "Widget Pro",
+      "quantity": 15,
+      "unit": "units",
+      "roomId": null,
+      "expiryDate": null
+    }
+  ],
+  "suggestions": [],
+  "clarifyingQuestion": null
+}
